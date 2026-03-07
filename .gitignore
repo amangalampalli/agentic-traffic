@@ -14,5 +14,5 @@ local/
 __pycache__
 CMakeSettings.json
 cmake-build-*
-
+CityFlow.egg-info
 frontend/replay/*
