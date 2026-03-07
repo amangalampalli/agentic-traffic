@@ -1,0 +1,23 @@
+name: "districtflow_baseline"
+
+scenario:
+  base_seed: 0
+  num_eval_seeds: 5
+  emergency_probability: 0.2
+  traffic_bias_options: ["balanced", "ns", "ew"]
+
+compare:
+  fixed_time: true
+  local_only: true
+  local_plus_district: true
+
+district_coordination:
+  enabled: true
+  mode: "rule_based"
+
+metrics:
+  - avg_wait
+  - avg_queue
+  - mean_reward
+  - emergency_travel_time
+  - throughput

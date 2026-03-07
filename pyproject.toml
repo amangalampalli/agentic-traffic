@@ -1,0 +1,35 @@
+[project]
+name = "traffic-llm"
+version = "0.1.0"
+description = "Using RL and LLMs to control traffic"
+authors = [
+    {name = "Aditya Mangalampalli",email = "aditya.mangalampalli@gmail.com"}
+]
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "numpy (>=2.4.2,<3.0.0)",
+    "scipy (>=1.17.1,<2.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)",
+    "tqdm (>=4.67.3,<5.0.0)",
+    "transformers (>=5.3.0,<6.0.0)",
+    "datasets (>=4.6.1,<5.0.0)",
+    "accelerate (>=1.13.0,<2.0.0)",
+    "fastapi (>=0.135.1,<0.136.0)",
+    "uvicorn (>=0.41.0,<0.42.0)",
+    "pydantic (>=2.12.5,<3.0.0)",
+    "requests (>=2.32.5,<3.0.0)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "torch (>=2.10.0,<3.0.0)",
+    "openenv-core (==0.2.1)",
+    "streamlit (>=1.55.0,<2.0.0)",
+    "pandas (>=2.3,<3.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "plotly (>=6.6.0,<7.0.0)",
+    "tensorboard (>=2.20.0,<3.0.0)",
+    "setuptools (==81.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

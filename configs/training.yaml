@@ -1,0 +1,31 @@
+seed: 0
+
+environment:
+  config_path: "data/cityflow/config.json"
+  coordination_interval: 20
+  max_steps: 300
+
+training:
+  train_seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  eval_seeds: [100, 101, 102]
+  num_epochs: 5
+  max_steps_per_episode: 300
+
+local_policy:
+  type: "heuristic"
+  min_green_steps: 5
+  switch_margin: 1.0
+  district_bonus_scale: 3.0
+  neighbor_pressure_scale: 0.25
+
+reward:
+  queue_weight: 0.5
+  waiting_weight: 1.0
+  switch_penalty: 0.1
+  throughput_bonus: 0.0
+  district_alignment_bonus: 0.75
+  targeted_bonus_multiplier: 1.25
+  emergency_bonus: 2.0
+
+output:
+  save_dir: "outputs/local_training"

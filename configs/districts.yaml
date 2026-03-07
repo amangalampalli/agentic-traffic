@@ -1,0 +1,37 @@
+districts:
+  D0:
+    intersection_ids: ["I1", "I2"]
+    neighbor_districts: ["D1"]
+
+  D1:
+    intersection_ids: ["I3", "I4"]
+    neighbor_districts: ["D0"]
+
+intersections:
+  I1:
+    district_id: "D0"
+    incoming_lanes: ["I1_N", "I1_S", "I1_E", "I1_W"]
+    outgoing_lanes: []
+    neighbors: ["I2"]
+    is_border: false
+
+  I2:
+    district_id: "D0"
+    incoming_lanes: ["I2_N", "I2_S", "I2_E", "I2_W"]
+    outgoing_lanes: []
+    neighbors: ["I1", "I3"]
+    is_border: true
+
+  I3:
+    district_id: "D1"
+    incoming_lanes: ["I3_N", "I3_S", "I3_E", "I3_W"]
+    outgoing_lanes: []
+    neighbors: ["I2", "I4"]
+    is_border: true
+
+  I4:
+    district_id: "D1"
+    incoming_lanes: ["I4_N", "I4_S", "I4_E", "I4_W"]
+    outgoing_lanes: []
+    neighbors: ["I3"]
+    is_border: false
