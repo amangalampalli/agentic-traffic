@@ -78,6 +78,7 @@ class RLCheckpointTeacher(BaseTeacher):
         from training.train_local_policy import load_env_config
 
         checkpoint_path = Path(checkpoint_path)
+        self._torch = torch
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.checkpoint = torch.load(
             checkpoint_path,
@@ -133,6 +134,7 @@ class RLCheckpointTeacher(BaseTeacher):
         return self._env_config
 
     def act(self, observation_batch: dict[str, Any]) -> np.ndarray:
+        torch = self._torch
         raw_obs = observation_batch["observations"].astype(np.float32)
         normalized_obs = self.obs_normalizer.normalize(raw_obs) if self.obs_normalizer else raw_obs
         obs_tensor = torch.as_tensor(normalized_obs, dtype=torch.float32, device=self.device)

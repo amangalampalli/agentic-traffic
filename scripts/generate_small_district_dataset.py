@@ -21,13 +21,18 @@ from env.reward import RewardConfig
 from env.traffic_env import EnvConfig
 from training.dataset import CityFlowDataset
 
+try:
+    from tqdm.auto import tqdm
+except ImportError:  # pragma: no cover
+    tqdm = None
+
 
 SYSTEM_PROMPT = (
     "You are a district traffic coordinator that outputs structured district guidance "
     "for RL traffic controllers. Return only valid JSON with fields: strategy, "
     "priority_corridor, target_intersections, phase_bias, duration_steps."
 )
-DEFAULT_OUTPUT_DIR = "outputs/district_llm_dataset_v1"
+DEFAULT_OUTPUT_DIR = "data/district_llm_dataset_v1"
 SCHEMA_VERSION = "district_action_v1_messages_v1"
 
 
@@ -227,33 +232,63 @@ def collect_split_rows(
     pending_non_dqn: list[dict[str, Any]] = []
     episode_index = 0
     max_rounds = max(10, target_rows * 2)
+    progress = (
+        tqdm(
+            total=target_rows,
+            desc=f"{split_name} rows",
+            dynamic_ncols=True,
+        )
+        if tqdm is not None
+        else None
+    )
 
-    while len(rows) < target_rows and episode_index < max_rounds:
-        scenario_spec = scenario_specs[episode_index % len(scenario_specs)]
-        for teacher in teachers:
-            env = build_env(env_config=env_config, scenario_spec=scenario_spec)
-            examples = generate_examples_for_episode(
-                env=env,
-                teacher=teacher,
-                district_interval=args.decision_interval,
-                top_k_congested=args.top_k_congested,
-                episode_index=episode_index,
-            )
-            for example in examples:
-                row = make_message_row(example)
-                key = row_key(row)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                if example["controller_family"] == "dqn":
-                    rows.append(row)
-                else:
-                    pending_non_dqn.append(row)
+    try:
+        while len(rows) < target_rows and episode_index < max_rounds:
+            scenario_spec = scenario_specs[episode_index % len(scenario_specs)]
+            if progress is not None:
+                progress.set_postfix_str(
+                    f"episode={episode_index} city={scenario_spec.city_id} scenario={scenario_spec.scenario_name}"
+                )
+            for teacher in teachers:
+                if progress is not None:
+                    progress.set_postfix_str(
+                        " ".join(
+                            [
+                                f"episode={episode_index}",
+                                f"city={scenario_spec.city_id}",
+                                f"scenario={scenario_spec.scenario_name}",
+                                f"teacher={teacher.metadata.controller_type}",
+                            ]
+                        )
+                    )
+                env = build_env(env_config=env_config, scenario_spec=scenario_spec)
+                examples = generate_examples_for_episode(
+                    env=env,
+                    teacher=teacher,
+                    district_interval=args.decision_interval,
+                    top_k_congested=args.top_k_congested,
+                    episode_index=episode_index,
+                )
+                for example in examples:
+                    row = make_message_row(example)
+                    key = row_key(row)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    if example["controller_family"] == "dqn":
+                        rows.append(row)
+                        if progress is not None:
+                            progress.update(1)
+                    else:
+                        pending_non_dqn.append(row)
+                    if len(rows) >= target_rows:
+                        break
                 if len(rows) >= target_rows:
                     break
-            if len(rows) >= target_rows:
-                break
-        episode_index += 1
+            episode_index += 1
+    finally:
+        if progress is not None:
+            progress.close()
 
     if len(rows) < target_rows:
         for row in pending_non_dqn:
@@ -302,6 +337,18 @@ def print_stats(split_name: str, rows: list[dict[str, Any]]) -> None:
     print(f"[{split_name}] rows_per_scenario={json.dumps(stats.rows_per_scenario, sort_keys=True)}")
 
 
+def validate_unique_rows(train_rows: list[dict[str, Any]], val_rows: list[dict[str, Any]]) -> None:
+    train_keys = [row_key(row) for row in train_rows]
+    val_keys = [row_key(row) for row in val_rows]
+    if len(train_keys) != len(set(train_keys)):
+        raise ValueError("Duplicate rows detected inside train split.")
+    if len(val_keys) != len(set(val_keys)):
+        raise ValueError("Duplicate rows detected inside val split.")
+    overlap = set(train_keys) & set(val_keys)
+    if overlap:
+        raise ValueError("Duplicate rows detected across train and val splits.")
+
+
 def main() -> None:
     args = parse_args()
     dataset = CityFlowDataset(
@@ -315,6 +362,10 @@ def main() -> None:
     checkpoint_env_configs = [
         teacher.env_config for teacher in teachers if teacher.env_config is not None
     ]
+    if checkpoint_env_configs[1:] and any(
+        config != checkpoint_env_configs[0] for config in checkpoint_env_configs[1:]
+    ):
+        raise ValueError("Teacher checkpoint env configs differ. Use one DQN family per pilot run.")
     env_config = checkpoint_env_configs[0] if checkpoint_env_configs else default_env_config()
 
     train_specs = build_scenario_specs(
@@ -346,6 +397,7 @@ def main() -> None:
         env_config=env_config,
         args=args,
     )
+    validate_unique_rows(train_rows, val_rows)
 
     output_dir = Path(args.output_dir)
     write_jsonl(output_dir / "train.jsonl", train_rows)
