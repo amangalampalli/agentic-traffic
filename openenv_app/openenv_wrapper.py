@@ -13,7 +13,7 @@ from district_llm.teachers import build_teacher, parse_teacher_spec
 from env.observation_builder import ObservationConfig
 from env.reward import RewardConfig
 from env.traffic_env import EnvConfig, TrafficEnv
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 
 
 class OpenEnvTrafficWrapper:

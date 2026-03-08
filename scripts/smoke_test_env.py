@@ -7,7 +7,7 @@ from collections import Counter
 import numpy as np
 
 from agents.local_policy import FixedCyclePolicy, HoldPhasePolicy
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 from training.train_local_policy import build_env, build_env_config
 
 

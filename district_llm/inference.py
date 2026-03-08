@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import json
+from pathlib import Path
 from typing import Any, Callable
 
 from district_llm.prompting import format_district_prompt
+from district_llm.repair import RepairConfig, RepairReport, sanitize_action_payload
 from district_llm.schema import DistrictAction, DistrictStateSummary
 from district_llm.summary_builder import DistrictStateSummaryBuilder
 from env.observation_builder import ObservationConfig
 from env.reward import RewardConfig
 from env.traffic_env import EnvConfig, TrafficEnv
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 
 
 def _extract_json_object(payload: str) -> str:
@@ -27,9 +30,11 @@ class DistrictLLMInference:
         model_name_or_path: str | None = None,
         device: str | None = None,
         fallback_action: DistrictAction | None = None,
+        repair_config: RepairConfig | None = None,
     ):
         self.fallback_action = fallback_action or DistrictAction.default_hold()
         self.generator_fn = generator_fn
+        self.repair_config = repair_config or RepairConfig()
         self.tokenizer = None
         self.model = None
         self.device = device or "cpu"
@@ -41,8 +46,19 @@ class DistrictLLMInference:
             from transformers import AutoModelForCausalLM, AutoTokenizer
 
             self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+            model_dir = Path(model_name_or_path)
             self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-            self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path).to(self.device)
+            if self.tokenizer.pad_token_id is None and self.tokenizer.eos_token_id is not None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+
+            if (model_dir / "adapter_config.json").exists():
+                try:
+                    from peft import AutoPeftModelForCausalLM
+                except ImportError as exc:
+                    raise ImportError("Loading a LoRA adapter requires the 'peft' package.") from exc
+                self.model = AutoPeftModelForCausalLM.from_pretrained(model_name_or_path)
+            else:
+                self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path).to(self.device)
             self.model.eval()
 
     def generate_raw(self, prompt: str, max_new_tokens: int = 128) -> str:
@@ -62,16 +78,30 @@ class DistrictLLMInference:
         generated = outputs[0][inputs["input_ids"].shape[1] :]
         return self.tokenizer.decode(generated, skip_special_tokens=True)
 
-    def parse_action(self, payload: str) -> DistrictAction:
+    def parse_action(
+        self,
+        payload: str,
+        summary: DistrictStateSummary | None = None,
+    ) -> tuple[DistrictAction, RepairReport]:
         try:
-            return DistrictAction.from_json(_extract_json_object(payload))
+            parsed_payload = json.loads(_extract_json_object(payload))
         except Exception:
-            return self.fallback_action
+            parsed_payload = self.fallback_action.to_dict()
+        return sanitize_action_payload(
+            payload=parsed_payload,
+            summary=summary,
+            config=self.repair_config,
+        )
 
     def predict(self, summary: DistrictStateSummary, max_new_tokens: int = 128) -> DistrictAction:
-        prompt = format_district_prompt(summary)
+        prompt = format_district_prompt(
+            summary,
+            max_target_intersections=self.repair_config.max_target_intersections,
+            allow_only_visible_candidates=self.repair_config.allow_only_visible_candidates,
+        )
         raw = self.generate_raw(prompt=prompt, max_new_tokens=max_new_tokens)
-        return self.parse_action(raw)
+        action, _ = self.parse_action(raw, summary=summary)
+        return action
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,6 +114,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--district-id", required=True)
     parser.add_argument("--device", default=None)
     parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument(
+        "--allow-only-visible-candidates",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--max-target-intersections", type=int, default=3)
+    parser.add_argument(
+        "--fallback-on-empty-targets",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--fallback-mode",
+        choices=("heuristic", "hold", "none"),
+        default="heuristic",
+    )
     return parser.parse_args()
 
 
@@ -117,7 +163,7 @@ def main() -> None:
     )
     scenario_spec = dataset.build_scenario_spec(args.city_id, args.scenario_name)
     env = build_env(scenario_spec)
-    summary_builder = DistrictStateSummaryBuilder()
+    summary_builder = DistrictStateSummaryBuilder(candidate_limit=max(6, args.max_target_intersections))
     observation_batch = env.reset()
     summaries = summary_builder.build_all(env, observation_batch)
     if args.district_id not in summaries:
@@ -126,6 +172,12 @@ def main() -> None:
         model_name_or_path=args.model,
         device=args.device,
         fallback_action=DistrictAction.default_hold(),
+        repair_config=RepairConfig(
+            allow_only_visible_candidates=args.allow_only_visible_candidates,
+            max_target_intersections=args.max_target_intersections,
+            fallback_on_empty_targets=args.fallback_on_empty_targets,
+            fallback_mode=args.fallback_mode,
+        ),
     )
     action = inference.predict(
         summary=summaries[args.district_id],

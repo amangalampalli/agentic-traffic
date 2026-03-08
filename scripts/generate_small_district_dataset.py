@@ -14,12 +14,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from district_llm.generate_dataset import build_env, generate_examples_for_episode
+from district_llm.prompting import build_system_prompt
 from district_llm.schema import DistrictAction
 from district_llm.teachers import BaseTeacher, build_teacher, parse_teacher_spec
 from env.observation_builder import ObservationConfig
 from env.reward import RewardConfig
 from env.traffic_env import EnvConfig
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 
 try:
     from tqdm.auto import tqdm
@@ -27,11 +28,6 @@ except ImportError:  # pragma: no cover
     tqdm = None
 
 
-SYSTEM_PROMPT = (
-    "You are a district traffic coordinator that outputs structured district guidance "
-    "for RL traffic controllers. Return only valid JSON with fields: strategy, "
-    "priority_corridor, target_intersections, phase_bias, duration_steps."
-)
 DEFAULT_OUTPUT_DIR = "data/district_llm_dataset_v1"
 SCHEMA_VERSION = "district_action_v1_messages_v1"
 
@@ -73,6 +69,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--decision-interval", type=int, default=10)
     parser.add_argument("--top-k-congested", type=int, default=3)
+    parser.add_argument("--max-candidate-intersections", type=int, default=6)
+    parser.add_argument("--max-target-intersections", type=int, default=3)
     parser.add_argument("--fixed-green-time", type=int, default=20)
     return parser.parse_args()
 
@@ -145,13 +143,13 @@ def build_scenario_specs(
     return scenario_specs
 
 
-def make_message_row(example: dict[str, Any]) -> dict[str, Any]:
+def make_message_row(example: dict[str, Any], system_prompt: str) -> dict[str, Any]:
     assistant_content = json.dumps(example["response_json"], sort_keys=True)
     user_content = extract_summary_text(example["prompt"])
 
     row = {
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
             {"role": "assistant", "content": assistant_content},
         ],
@@ -164,6 +162,7 @@ def make_message_row(example: dict[str, Any]) -> dict[str, Any]:
         "teacher_algorithm": example["teacher_algorithm"],
         "controller_id": example["controller_id"],
         "checkpoint_path": example["checkpoint_path"],
+        "candidate_intersections": example.get("candidate_intersections", []),
     }
     validate_row(row)
     return row
@@ -228,6 +227,10 @@ def collect_split_rows(
     args: argparse.Namespace,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    system_prompt = build_system_prompt(
+        max_target_intersections=args.max_target_intersections,
+        allow_only_visible_candidates=True,
+    )
     seen_keys: set[str] = set()
     pending_non_dqn: list[dict[str, Any]] = []
     episode_index = 0
@@ -267,10 +270,12 @@ def collect_split_rows(
                     teacher=teacher,
                     district_interval=args.decision_interval,
                     top_k_congested=args.top_k_congested,
+                    max_candidate_intersections=args.max_candidate_intersections,
+                    max_target_intersections=args.max_target_intersections,
                     episode_index=episode_index,
                 )
                 for example in examples:
-                    row = make_message_row(example)
+                    row = make_message_row(example, system_prompt=system_prompt)
                     key = row_key(row)
                     if key in seen_keys:
                         continue

@@ -16,7 +16,7 @@ from district_llm.teachers import BaseTeacher, build_teacher, parse_teacher_spec
 from env.observation_builder import ObservationConfig
 from env.reward import RewardConfig
 from env.traffic_env import EnvConfig, TrafficEnv
-from training.dataset import CityFlowDataset, ScenarioSpec
+from training.cityflow_dataset import CityFlowDataset, ScenarioSpec
 
 
 @dataclass
@@ -63,6 +63,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default=None)
     parser.add_argument("--append", action="store_true")
     parser.add_argument("--top-k-congested", type=int, default=3)
+    parser.add_argument("--max-candidate-intersections", type=int, default=6)
+    parser.add_argument("--max-target-intersections", type=int, default=3)
     parser.add_argument("--use-checkpoint-env-config", action="store_true")
 
     parser.add_argument("--env-decision-interval", type=int, default=5)
@@ -239,9 +241,14 @@ def generate_examples_for_episode(
     teacher: BaseTeacher,
     district_interval: int,
     top_k_congested: int,
+    max_candidate_intersections: int,
+    max_target_intersections: int,
     episode_index: int,
 ) -> list[dict[str, Any]]:
-    summary_builder = DistrictStateSummaryBuilder(top_k=top_k_congested)
+    summary_builder = DistrictStateSummaryBuilder(
+        top_k=top_k_congested,
+        candidate_limit=max_candidate_intersections,
+    )
     observation_batch = env.reset()
     summary_builder.reset()
     current_summaries = summary_builder.build_all(env, observation_batch)
@@ -275,14 +282,27 @@ def generate_examples_for_episode(
                 controller_actions=list(buffer.controller_actions),
                 step_count=buffer.step_count,
             )
-            action = derive_district_action(window_data=window_data)
-            prompt = format_district_prompt(buffer.start_summary)
+            action = derive_district_action(
+                window_data=window_data,
+                max_target_intersections=max_target_intersections,
+            )
+            prompt = format_district_prompt(
+                buffer.start_summary,
+                max_target_intersections=max_target_intersections,
+                allow_only_visible_candidates=True,
+            )
             samples.append(
                 {
-                    "text": format_sft_text(buffer.start_summary, action),
+                    "text": format_sft_text(
+                        buffer.start_summary,
+                        action,
+                        max_target_intersections=max_target_intersections,
+                        allow_only_visible_candidates=True,
+                    ),
                     "prompt": prompt,
                     "response_json": action.to_dict(),
                     "state": buffer.start_summary.to_dict(),
+                    "candidate_intersections": buffer.start_summary.to_dict().get("candidate_intersections", []),
                     "window_summary": window_data.to_dict(),
                     "city_id": env.city_id,
                     "district_id": district_id,
@@ -347,6 +367,8 @@ def main() -> None:
                     teacher=teacher,
                     district_interval=args.district_decision_interval,
                     top_k_congested=args.top_k_congested,
+                    max_candidate_intersections=args.max_candidate_intersections,
+                    max_target_intersections=args.max_target_intersections,
                     episode_index=episode_index,
                 )
             )
