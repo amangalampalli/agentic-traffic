@@ -1,0 +1,61 @@
+
+==============================================================================
+ANOVA RESULTS: Learned DQN vs FixedCycle vs Random
+==============================================================================
+
+------------------------------------------------------------------------------
+  Metric : Episode Return
+  Test   : ANOVA  (F=0.0686,  p=0.9337 ns,  eta2=0.0010)
+  n      : {'learned': 45, 'fixed': 45, 'random': 45}
+  Means  :
+           learned        -0.0932  +/-  0.0192  (higher=better)
+           fixed          -0.0941  +/-  0.0189
+           random         -0.0947  +/-  0.0192
+  Tukey HSD pairwise:
+           learned    vs fixed       delta=+0.0009  p=0.9707 ns  not significant  [RL wins]
+           learned    vs random      delta=+0.0015  p=0.9288 ns  not significant  [RL wins]
+           fixed      vs random      delta=+0.0005  p=0.9902 ns  not significant
+
+------------------------------------------------------------------------------
+  Metric : Mean Waiting Vehicles
+  Test   : ANOVA  (F=0.0036,  p=0.9964 ns,  eta2=0.0001)
+  n      : {'learned': 45, 'fixed': 45, 'random': 45}
+  Means  :
+           learned        87.1643  +/-  15.4577  (lower=better)
+           fixed          87.3930  +/-  15.1609
+           random         87.4153  +/-  15.2720
+  Tukey HSD pairwise:
+           learned    vs fixed       delta=-0.2287  p=0.9973 ns  not significant  [RL wins]
+           learned    vs random      delta=-0.2510  p=0.9967 ns  not significant  [RL wins]
+           fixed      vs random      delta=-0.0223  p=1.0000 ns  not significant
+
+------------------------------------------------------------------------------
+  Metric : Average Travel Time (s)
+  Test   : ANOVA  (F=0.2142,  p=0.8074 ns,  eta2=0.0032)
+  n      : {'learned': 45, 'fixed': 45, 'random': 45}
+  Means  :
+           learned      1228.5484  +/-  163.6671  (lower=better)
+           fixed        1239.8208  +/-  159.8277
+           random       1251.0375  +/-  159.9236
+  Tukey HSD pairwise:
+           learned    vs fixed       delta=-11.2724  p=0.9424 ns  not significant  [RL wins]
+           learned    vs random      delta=-22.4890  p=0.7901 ns  not significant  [RL wins]
+           fixed      vs random      delta=-11.2166  p=0.9430 ns  not significant
+
+------------------------------------------------------------------------------
+  Metric : Throughput (vehicles)
+  Test   : Kruskal-Wallis  (H=0.3527,  p=0.8383 ns,  eta2=0.0022)
+  n      : {'learned': 45, 'fixed': 45, 'random': 45}
+  Means  :
+           learned      7728.3778  +/-  2747.5912  (higher=better)
+           fixed        7581.1333  +/-  2639.3891
+           random       7418.6444  +/-  2630.5805
+  Tukey HSD pairwise:
+           learned    vs fixed       delta=+147.2444  p=0.9639 ns  not significant  [RL wins]
+           learned    vs random      delta=+309.7333  p=0.8500 ns  not significant  [RL wins]
+           fixed      vs random      delta=+162.4889  p=0.9562 ns  not significant
+  [!] Normality violated for at least one group -- Kruskal-Wallis preferred.
+
+==============================================================================
+Significance: *** p<0.001  ** p<0.01  * p<0.05  ns = not significant
+==============================================================================
