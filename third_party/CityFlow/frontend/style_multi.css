@@ -26,7 +26,13 @@ body {
   padding: 16px;
   gap: 16px;
   z-index: 10;
+  scrollbar-width: thin;
+  scrollbar-color: #3a4055 transparent;
 }
+#sidebar::-webkit-scrollbar { width: 5px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: #3a4055; border-radius: 3px; }
+#sidebar::-webkit-scrollbar-thumb:hover { background: #5b6cf9; }
 
 #sidebar h1 {
   font-size: 18px;
@@ -356,7 +362,7 @@ body {
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: 1fr;
 }
-#panels-container.layout-5 {
+#panels-container.layout-6 {
   grid-template-columns: 1fr 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
@@ -391,7 +397,17 @@ body {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+/* Dark background box wrapping dot + policy name */
+.panel-label-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 4px 8px;
+  pointer-events: none;
 }
 /* Per-panel zoom controls */
 .panel-zoom-controls {
@@ -424,7 +440,7 @@ body {
   bottom: 8px;
   left: 8px;
   z-index: 5;
-  background: rgba(0, 0, 0, 0.52);
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(4px);
   border-radius: 6px;
   padding: 5px 9px;
@@ -520,6 +536,7 @@ body {
   --color-random:          #10b981;
   --color-learned:         #5b6cf9;
   --color-llm-dqn:         #ec4899;
+  --color-dqn-heuristic:   #06b6d4;
 }
 
 /* Responsive: if viewport too narrow, collapse sidebar */
