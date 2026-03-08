@@ -175,6 +175,9 @@ def run_policy_for_city(
     finally:
         temp_config_path.unlink(missing_ok=True)
 
+    # Persist metrics so subsequent requests can be served from cache.
+    (output_dir / "metrics.json").write_text(json.dumps(metrics))
+
     return RunResult(
         policy_name=policy_name,
         metrics=metrics,

@@ -72,6 +72,7 @@ class RunSimulationsRequest(BaseModel):
     city_id: str
     scenario_name: str
     policies: list[str] = list(ALL_POLICIES)
+    force: bool = False  # bypass cache and re-run even if results exist
 
 
 class PolicyMetrics(BaseModel):
@@ -154,6 +155,21 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
         )
 
     def _run_one(policy_name: str) -> PolicyMetrics:
+        output_dir     = REPLAY_OUTPUT_ROOT / request.city_id / request.scenario_name / policy_name
+        replay_path    = output_dir / "replay.txt"
+        roadnet_path   = output_dir / "roadnetLogFile.json"
+        metrics_path   = output_dir / "metrics.json"
+
+        # Serve from cache when all files exist and force-rerun is not requested.
+        if not request.force and replay_path.exists() and metrics_path.exists():
+            print(f"[server] cache hit: {request.city_id}/{request.scenario_name}/{policy_name}")
+            return PolicyMetrics(
+                policy_name=policy_name,
+                metrics=json.loads(metrics_path.read_text()),
+                replay_available=True,
+                roadnet_log_available=roadnet_path.exists(),
+            )
+
         try:
             result: RunResult = run_policy_for_city(
                 city_id=request.city_id,
