@@ -16,7 +16,8 @@ const POLICY_META = {
   fixed:           { label: "Fixed Cycle",     color: 0xf59e0b, cssVar: "--color-fixed" },
   random:          { label: "Random Phase",    color: 0x10b981, cssVar: "--color-random" },
   learned:         { label: "DQN (Learned)",   color: 0x5b6cf9, cssVar: "--color-learned" },
-  llm_dqn:         { label: "LLM + DQN",       color: 0xec4899, cssVar: "--color-llm-dqn", comingSoon: true },
+  dqn_heuristic:   { label: "DQN + Heuristic", color: 0x06b6d4, cssVar: "--color-dqn-heuristic", comingSoon: true },
+  llm_dqn:         { label: "LLM + DQN",       color: 0xec4899, cssVar: "--color-llm-dqn",       comingSoon: true },
 };
 
 const ALL_POLICY_KEYS = Object.keys(POLICY_META);
@@ -448,6 +449,10 @@ class SimPanel {
     const header = document.createElement("div");
     header.className = "panel-header";
 
+    // Label box — dark background so text is readable over the map
+    const labelBox = document.createElement("div");
+    labelBox.className = "panel-label-box";
+
     const dot = document.createElement("span");
     dot.className = "panel-policy-dot";
     dot.style.background = colorHex;
@@ -457,8 +462,9 @@ class SimPanel {
     name.textContent = this.meta.label;
     name.style.color = colorHex;
 
-    header.appendChild(dot);
-    header.appendChild(name);
+    labelBox.appendChild(dot);
+    labelBox.appendChild(name);
+    header.appendChild(labelBox);
 
     // Zoom buttons (pointer-events: auto overrides the header's none)
     const zoomWrap = document.createElement("div");
