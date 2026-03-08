@@ -1,0 +1,75 @@
+# ── HF Space 1: OpenEnv API ────────────────────────────────────────────────
+#
+# Two-stage build:
+#   1. builder  — installs build tools, compiles CityFlow C++ → cityflow.so
+#   2. runtime  — clean Python image, copies only what's needed to run
+#
+# HF Spaces expects the app to listen on port 7860.
+#
+# Required env vars (set in the Space settings or README front matter):
+#   DATA_DIR          path to city configs (default: /app/data/bundled)
+#   CHECKPOINT_PATH   path to DQN .pt file (default: /app/artifacts/dqn_shared/best_validation.pt)
+# ---------------------------------------------------------------------------
+
+# ── Stage 1: Build CityFlow ─────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+# Build tools needed by CityFlow's CMake build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        libboost-all-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy only the CityFlow source (pybind11 is bundled as an extern submodule)
+COPY third_party/CityFlow ./CityFlow
+
+# Build and install cityflow into the builder's site-packages
+RUN pip install --no-cache-dir ./CityFlow
+
+# Locate the compiled .so so we can copy it to the runtime stage
+RUN python -c "import cityflow, os; print(os.path.dirname(cityflow.__file__))"
+
+
+# ── Stage 2: Runtime ────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+
+# Copy the compiled cityflow extension from the builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages/cityflow* \
+                    /usr/local/lib/python3.12/site-packages/
+
+# Install Python dependencies (no build tools needed here)
+COPY openenv_app/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source (only what the OpenEnv API needs at runtime)
+COPY agents/         ./agents/
+COPY district_llm/   ./district_llm/
+COPY env/            ./env/
+COPY openenv_app/    ./openenv_app/
+COPY server/__init__.py           ./server/__init__.py
+COPY server/path_validators.py    ./server/path_validators.py
+COPY server/policy_runner.py      ./server/policy_runner.py
+COPY server/roadnet_matcher.py    ./server/roadnet_matcher.py
+COPY training/       ./training/
+
+# Bundled city data
+COPY data/bundled/   ./data/bundled/
+
+# DQN checkpoint — omit this COPY if you haven't trained yet; the app will
+# start without it and log a warning (the 'learned' policy will be unavailable).
+# To bundle it: place best_validation.pt at artifacts/dqn_shared/ before building.
+# COPY artifacts/dqn_shared/best_validation.pt ./artifacts/dqn_shared/best_validation.pt
+
+# Default paths (overridable at runtime via env vars)
+ENV DATA_DIR=/app/data/bundled
+ENV CHECKPOINT_PATH=/app/artifacts/dqn_shared/best_validation.pt
+
+# HF Spaces requires port 7860
+EXPOSE 7860
+
+CMD ["uvicorn", "openenv_app.app:app", "--host", "0.0.0.0", "--port", "7860"]

@@ -1,0 +1,41 @@
+# ── HF Space 2: Visualizer Dashboard ──────────────────────────────────────
+#
+# Lightweight image — no CityFlow C++ build, no torch.
+# All simulation runs are delegated to Space 1 (OpenEnv API) via HTTP.
+#
+# HF Spaces expects the app to listen on port 7860.
+#
+# Required env vars (set in the Space settings or README front matter):
+#   OPENENV_API_URL   URL of the OpenEnv API Space
+#                     e.g. https://your-org-openenv-api.hf.space
+#
+# Optional:
+#   DATA_DIR          city config root for roadnet matching (default: /app/data/bundled)
+#   REPLAY_ROOT       where replays are cached on disk (default: /app/results/replays)
+# ---------------------------------------------------------------------------
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies (no cmake / build-essential needed)
+COPY server/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Application source
+COPY server/           ./server/
+COPY third_party/CityFlow/frontend/ ./third_party/CityFlow/frontend/
+
+# Bundled city data (for roadnet matching / city/scenario dropdowns)
+COPY data/bundled/  ./data/bundled/
+COPY data/splits/   ./data/splits/
+
+# Writable directory for cached replays
+RUN mkdir -p /app/results/replays
+
+ENV DATA_DIR=/app/data/bundled
+ENV REPLAY_ROOT=/app/results/replays
+
+EXPOSE 7860
+
+CMD ["uvicorn", "server.visualizer_app:app", "--host", "0.0.0.0", "--port", "7860"]
