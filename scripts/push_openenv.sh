@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAGE_DIR="${1:-/tmp/agentic-traffic-openenv-push}"
-REPO_ID="${2:-Aditya2162/agentic-traffic}"
+REPO_ID="${2:-tokev/traffic-visualizer}"
 
 "${ROOT_DIR}/scripts/prepare_openenv_push.sh" "${STAGE_DIR}"
 
