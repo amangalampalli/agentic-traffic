@@ -1,0 +1,13 @@
+name: districtflow-openenv-api
+version: 0.1.0
+runtime:
+  type: docker
+  dockerfile: server/Dockerfile
+server:
+  port: 7860
+env:
+  PORT: "7860"
+  DATA_DIR: /app/data/generated
+  SPLITS_DIR: /app/data/splits
+  CHECKPOINT_PATH: /app/artifacts/dqn_shared/best_validation.pt
+  DISTRICT_LLM_ADAPTER_PATH: /app/artifacts/district_llm_adapter_v3/main_run/adapter

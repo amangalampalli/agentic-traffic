@@ -41,9 +41,9 @@ from scripts.eval_rl_guidance_ablation import (
 from training.cityflow_dataset import CityFlowDataset
 
 
-DEFAULT_SEEDS: tuple[int, ...] = (7, 11, 17, 23, 31)
-PREFERRED_DEFAULT_CITIES: tuple[str, ...] = ("city_0001", "city_0002")
-PREFERRED_DEFAULT_SCENARIOS: tuple[str, ...] = ("normal", "morning_rush", "accident")
+DEFAULT_SEEDS: tuple[int, ...] = (7,)
+PREFERRED_DEFAULT_CITIES: tuple[str, ...] = ("city_0001",)
+PREFERRED_DEFAULT_SCENARIOS: tuple[str, ...] = ("normal",)
 SCENARIO_ALIASES: dict[str, str] = {
     "rush": "morning_rush",
 }

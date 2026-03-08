@@ -170,6 +170,87 @@ body {
   padding: 1px 5px;
 }
 
+.recent-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.recent-run-empty {
+  font-size: 12px;
+  color: #777e90;
+}
+.recent-run-card {
+  border: 1px solid #323747;
+  border-radius: 7px;
+  background: #22252e;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recent-run-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.recent-run-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e7ecf4;
+}
+.recent-run-time {
+  font-size: 10px;
+  color: #7f8a9d;
+  white-space: nowrap;
+}
+.recent-run-meta {
+  font-size: 11px;
+  color: #aab4c4;
+}
+.recent-run-policies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.recent-run-chip {
+  font-size: 10px;
+  color: #dbe2ee;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.debug-log {
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: #161a22;
+  border: 1px solid #2c3442;
+  color: #dbe4ff;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+.recent-run-actions {
+  display: flex;
+  gap: 6px;
+}
+.recent-run-btn {
+  flex: 1;
+  background: #2b3040;
+  border: 1px solid #40475d;
+  color: #dce3ef;
+  border-radius: 5px;
+  padding: 5px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.recent-run-btn:hover {
+  border-color: #5b6cf9;
+}
+
 /* View mode selector */
 .view-mode-row {
   display: flex;
@@ -322,6 +403,81 @@ body {
 #playback-bar button:hover { background: #3a4055; }
 #playback-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+#summary-bar {
+  background: #1c2028;
+  border-bottom: 1px solid #2c3341;
+  padding: 10px 12px;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.summary-empty {
+  color: #8d97aa;
+  font-size: 13px;
+}
+
+.summary-card {
+  min-width: 245px;
+  background: #222733;
+  border: 1px solid #313949;
+  border-top: 3px solid var(--summary-color, #5b6cf9);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.summary-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #edf2ff;
+}
+
+.summary-card-subtitle {
+  font-size: 10px;
+  color: #9aa4b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.summary-stat-label {
+  font-size: 10px;
+  color: #8893a8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summary-stat-value {
+  font-size: 13px;
+  color: #f5f7fb;
+  font-weight: 600;
+}
+
+.summary-delta {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.summary-delta.good { color: #34d399; }
+.summary-delta.bad { color: #f87171; }
+.summary-delta.neutral { color: #94a3b8; }
+
 #scrubber {
   flex: 1;
   accent-color: #5b6cf9;
@@ -457,6 +613,52 @@ body {
 }
 .pmo-label { color: #9ea8b8; }
 .pmo-value { color: #e2ddd6; font-variant-numeric: tabular-nums; }
+
+.panel-map-legend {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  border-radius: 6px;
+  padding: 6px 8px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 108px;
+}
+.panel-map-legend.hidden { display: none; }
+.panel-map-legend-title {
+  font-size: 9px;
+  color: #b8c1cf;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: 1px;
+}
+.panel-map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #e2ddd6;
+}
+.panel-map-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.panel-map-swatch.districts {
+  background: rgba(95, 172, 248, 0.55);
+  border: 1px solid rgba(95, 172, 248, 0.8);
+}
+.panel-map-swatch.entry { background: #22c55e; }
+.panel-map-swatch.exit { background: #ef4444; }
+.panel-map-swatch.gateway { background: #f39c12; }
 
 .panel-canvas-wrapper {
   flex: 1;

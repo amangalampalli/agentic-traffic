@@ -1,16 +1,16 @@
-# ── HF Space 1: OpenEnv API ────────────────────────────────────────────────
+# OpenEnv API container
 #
 # Two-stage build:
-#   1. builder  — installs build tools, compiles CityFlow C++ → cityflow.so
-#   2. runtime  — clean Python image, copies only what's needed to run
+#   1. builder  - compiles the vendored CityFlow Python extension
+#   2. runtime  - installs the API dependencies and copies the repo-local data
 #
-# HF Spaces expects the app to listen on port 7860.
-#
-# Required env vars (set in the Space settings or README front matter):
-#   HF_DATASET_REPO   HF dataset repo with bundled city data
-#                     e.g. tokev/districtflow-cities
-#   DATA_DIR          path to city configs (default: /app/data/bundled)
-#   CHECKPOINT_PATH   path to DQN .pt file (default: /app/artifacts/dqn_shared/best_validation.pt)
+# Runtime env vars:
+#   DATA_DIR         generated CityFlow dataset root
+#                    default: /app/data/generated
+#   SPLITS_DIR       train/val/test split files
+#                    default: /app/data/splits
+#   CHECKPOINT_PATH  optional DQN checkpoint
+#                    default: /app/artifacts/dqn_shared/best_validation.pt
 # ---------------------------------------------------------------------------
 
 # ── Stage 1: Build CityFlow ─────────────────────────────────────────────────
@@ -29,6 +29,7 @@ WORKDIR /build
 COPY third_party/CityFlow ./CityFlow
 
 # Build and install cityflow into the builder's site-packages
+RUN rm -rf ./CityFlow/build
 RUN pip install --no-cache-dir ./CityFlow
 
 # Locate the compiled .so so we can copy it to the runtime stage
@@ -58,26 +59,23 @@ COPY server/path_validators.py    ./server/path_validators.py
 COPY server/policy_runner.py      ./server/policy_runner.py
 COPY server/roadnet_matcher.py    ./server/roadnet_matcher.py
 COPY training/       ./training/
+COPY data/splits/    ./data/splits/
+COPY artifacts/dqn_shared/best_validation.pt ./artifacts/dqn_shared/best_validation.pt
+COPY artifacts/district_llm_adapter_v3/main_run/adapter/ ./artifacts/district_llm_adapter_v3/main_run/adapter/
 
-# Download city data from HF Dataset at build time.
-# Set HF_DATASET_REPO to your dataset repo (e.g. tokev/districtflow-cities).
-# If the dataset is private, also set HF_TOKEN in Space secrets.
-ARG HF_DATASET_REPO=tokev/districtflow-cities
-RUN huggingface-cli download "${HF_DATASET_REPO}" \
-        --repo-type dataset \
-        --local-dir /app/data/bundled \
-    && echo "City data downloaded from ${HF_DATASET_REPO}"
+# Keep runtime paths present, but expect the actual generated dataset to be
+# mounted or synced separately instead of baked into the image.
+RUN mkdir -p /app/data/generated /app/data/splits
 
-# DQN checkpoint — omit this COPY if you haven't trained yet; the app will
-# start without it and log a warning (the 'learned' policy will be unavailable).
-# To bundle it: place best_validation.pt at artifacts/dqn_shared/ before building.
-# COPY artifacts/dqn_shared/best_validation.pt ./artifacts/dqn_shared/best_validation.pt
-
-# Default paths (overridable at runtime via env vars)
-ENV DATA_DIR=/app/data/bundled
+# Default paths (overridable at runtime via env vars).
+# DATA_DIR must point at a mounted/generated dataset root that contains city_*/
+# directories and scenario files; only data/splits is bundled here.
+ENV DATA_DIR=/app/data/generated
+ENV SPLITS_DIR=/app/data/splits
 ENV CHECKPOINT_PATH=/app/artifacts/dqn_shared/best_validation.pt
+ENV DISTRICT_LLM_ADAPTER_PATH=/app/artifacts/district_llm_adapter_v3/main_run/adapter
 
-# HF Spaces requires port 7860
+# OpenEnv and HF Spaces commonly use port 7860.
 EXPOSE 7860
 
-CMD ["uvicorn", "openenv_app.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "uvicorn openenv_app.app:app --host 0.0.0.0 --port ${PORT:-7860}"]

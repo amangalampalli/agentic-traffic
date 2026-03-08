@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,6 +22,16 @@ def _extract_json_object(payload: str) -> str:
     if start == -1 or end == -1 or end <= start:
         raise ValueError("No JSON object found in model output.")
     return payload[start : end + 1]
+
+
+@dataclass(frozen=True)
+class DistrictLLMInferenceResult:
+    action: DistrictAction
+    raw_text: str
+    parsed_payload_before_repair: dict[str, Any]
+    repair_report: RepairReport
+    json_valid: bool
+    schema_valid_before_repair: bool
 
 
 class DistrictLLMInference:
@@ -56,7 +67,7 @@ class DistrictLLMInference:
                     from peft import AutoPeftModelForCausalLM
                 except ImportError as exc:
                     raise ImportError("Loading a LoRA adapter requires the 'peft' package.") from exc
-                self.model = AutoPeftModelForCausalLM.from_pretrained(model_name_or_path)
+                self.model = AutoPeftModelForCausalLM.from_pretrained(model_name_or_path).to(self.device)
             else:
                 self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path).to(self.device)
             self.model.eval()
@@ -82,26 +93,48 @@ class DistrictLLMInference:
         self,
         payload: str,
         summary: DistrictStateSummary | None = None,
-    ) -> tuple[DistrictAction, RepairReport]:
+    ) -> tuple[DistrictAction, RepairReport, dict[str, Any], bool, bool]:
+        json_valid = True
+        schema_valid_before_repair = True
         try:
             parsed_payload = json.loads(_extract_json_object(payload))
         except Exception:
+            json_valid = False
+            schema_valid_before_repair = False
             parsed_payload = self.fallback_action.to_dict()
-        return sanitize_action_payload(
+        action, repair_report = sanitize_action_payload(
             payload=parsed_payload,
             summary=summary,
             config=self.repair_config,
         )
+        return action, repair_report, parsed_payload, json_valid, schema_valid_before_repair
 
-    def predict(self, summary: DistrictStateSummary, max_new_tokens: int = 128) -> DistrictAction:
+    def predict_with_result(
+        self,
+        summary: DistrictStateSummary,
+        max_new_tokens: int = 128,
+    ) -> DistrictLLMInferenceResult:
         prompt = format_district_prompt(
             summary,
             max_target_intersections=self.repair_config.max_target_intersections,
             allow_only_visible_candidates=self.repair_config.allow_only_visible_candidates,
         )
         raw = self.generate_raw(prompt=prompt, max_new_tokens=max_new_tokens)
-        action, _ = self.parse_action(raw, summary=summary)
-        return action
+        action, repair_report, parsed_payload, json_valid, schema_valid_before_repair = self.parse_action(
+            raw,
+            summary=summary,
+        )
+        return DistrictLLMInferenceResult(
+            action=action,
+            raw_text=raw,
+            parsed_payload_before_repair=parsed_payload,
+            repair_report=repair_report,
+            json_valid=json_valid,
+            schema_valid_before_repair=schema_valid_before_repair,
+        )
+
+    def predict(self, summary: DistrictStateSummary, max_new_tokens: int = 128) -> DistrictAction:
+        return self.predict_with_result(summary=summary, max_new_tokens=max_new_tokens).action
 
 
 def parse_args() -> argparse.Namespace:

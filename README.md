@@ -1,3 +1,14 @@
+---
+title: Agentic Traffic
+emoji: 🏢
+colorFrom: green
+colorTo: purple
+sdk: docker
+pinned: false
+short_description: Agentic AI to control traffic lights
+app_port: 7860
+---
+
 # traffic-llm
 
 CityFlow-based traffic-control project with intersection-level multi-agent DQN training and district-aware policy variants.

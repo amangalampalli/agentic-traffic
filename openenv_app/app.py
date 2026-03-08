@@ -24,7 +24,8 @@ from server.path_validators import validate_path_segment
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = Path(os.environ.get("DATA_DIR", "") or (_REPO_ROOT / "data" / "bundled"))
+DATA_DIR = Path(os.environ.get("DATA_DIR", "") or (_REPO_ROOT / "data" / "generated"))
+SPLITS_DIR = Path(os.environ.get("SPLITS_DIR", "") or (_REPO_ROOT / "data" / "splits"))
 CHECKPOINT_PATH = Path(
     os.environ.get("CHECKPOINT_PATH", "")
     or (_REPO_ROOT / "artifacts" / "dqn_shared" / "best_validation.pt")
@@ -64,7 +65,10 @@ _wrapper: OpenEnvTrafficWrapper | None = None
 def _get_wrapper() -> OpenEnvTrafficWrapper:
     global _wrapper
     if _wrapper is None:
-        _wrapper = OpenEnvTrafficWrapper()
+        _wrapper = OpenEnvTrafficWrapper(
+            generated_root=DATA_DIR,
+            splits_root=SPLITS_DIR,
+        )
     return _wrapper
 
 

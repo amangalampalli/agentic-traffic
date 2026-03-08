@@ -5,8 +5,8 @@
   <title>Traffic Visualizer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.8.2/pixi.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pixi-viewport@4.2.3/dist/viewport.min.js"></script>
-  <link rel="stylesheet" href="/static/style_multi.css">
-  <script src="/static/Point.js"></script>
+  <link rel="stylesheet" href="/static/style_multi.css?v=20260308h">
+  <script src="/static/Point.js?v=20260308h"></script>
   <style>
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(8px); }
@@ -78,6 +78,20 @@
 
   <!-- Progress -->
   <div class="sidebar-section" id="progress-section" style="display:none;"></div>
+
+  <!-- Debug log -->
+  <div class="sidebar-section" id="debug-log-section">
+    <h3>Debug Log</h3>
+    <div id="debug-log" class="debug-log"></div>
+  </div>
+
+  <!-- Recent runs -->
+  <div class="sidebar-section" id="recent-runs-section">
+    <h3>Recent Runs</h3>
+    <div id="recent-runs-list" class="recent-runs-list">
+      <div class="recent-run-empty">No saved runs yet.</div>
+    </div>
+  </div>
 </aside>
 
 <div id="sidebar-resize-handle"></div>
@@ -93,6 +107,10 @@
     <button id="speed-up">&#43;</button>
     <span id="speed-label">0.5x</span>
     <span id="step-display">0 / 0</span>
+  </div>
+
+  <div id="summary-bar">
+    <div class="summary-empty">Run a simulation to compare policy metrics.</div>
   </div>
 
   <!-- Panels container -->
@@ -113,6 +131,6 @@
 
 </div>
 
-<script src="/static/script_multi.js"></script>
+<script src="/static/script_multi.js?v=20260308h"></script>
 </body>
 </html>

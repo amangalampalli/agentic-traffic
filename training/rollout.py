@@ -27,11 +27,17 @@ def evaluate_policy(
     device: torch.device | None = None,
     obs_normalizer: RunningNormalizer | None = None,
     deterministic: bool = True,
+    log_prefix: str | None = None,
+    log_every_steps: int = 0,
 ) -> dict[str, float | str]:
     env = env_factory()
     observation_batch = env.reset()
     done = False
     final_info = env.last_info
+    max_decision_steps = max(
+        1,
+        int(getattr(env, "max_episode_seconds", 0) // max(1, env.env_config.decision_interval)),
+    )
 
     while not done:
         if isinstance(actor, BaseLocalPolicy):
@@ -61,6 +67,17 @@ def evaluate_policy(
             actions = action_tensor.cpu().numpy()
 
         observation_batch, _, done, final_info = env.step(actions)
+        if log_prefix and log_every_steps > 0:
+            decision_step = int(getattr(env, "decision_step_count", 0))
+            should_log = decision_step == 1 or done or (decision_step % log_every_steps == 0)
+            if should_log:
+                sim_time = int(getattr(env.adapter, "get_current_time", lambda: 0)())
+                metrics = final_info.get("metrics", {}) if isinstance(final_info, dict) else {}
+                print(
+                    f"{log_prefix} step={decision_step}/{max_decision_steps} "
+                    f"sim_time={sim_time}s wait={float(metrics.get('mean_waiting_vehicles', float('nan'))):.2f} "
+                    f"throughput={float(metrics.get('throughput', float('nan'))):.1f}"
+                )
 
     metrics = {
         key: float(value)

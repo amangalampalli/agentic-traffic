@@ -16,8 +16,8 @@ const POLICY_META = {
   fixed:           { label: "Fixed Cycle",     color: 0xf59e0b, cssVar: "--color-fixed" },
   random:          { label: "Random Phase",    color: 0x10b981, cssVar: "--color-random" },
   learned:         { label: "DQN (Learned)",   color: 0x5b6cf9, cssVar: "--color-learned" },
-  dqn_heuristic:   { label: "DQN + Heuristic", color: 0x06b6d4, cssVar: "--color-dqn-heuristic", comingSoon: true },
-  llm_dqn:         { label: "LLM + DQN",       color: 0xec4899, cssVar: "--color-llm-dqn",       comingSoon: true },
+  dqn_heuristic:   { label: "DQN + Heuristic", color: 0x06b6d4, cssVar: "--color-dqn-heuristic" },
+  llm_dqn:         { label: "DQN + LLM",       color: 0xec4899, cssVar: "--color-llm-dqn" },
 };
 
 const ALL_POLICY_KEYS = Object.keys(POLICY_META);
@@ -30,10 +30,26 @@ const LANE_BORDER_WIDTH = 1;
 const LANE_DASH  = 10;
 const LANE_GAP   = 12;
 const ROTATE     = 90;
+const DISTRICT_BORDER_COLOR = 0x34495e;
+const GATEWAY_NODE_COLOR    = 0xf39c12;
+const GATEWAY_EDGE_COLOR    = 0xe67e22;
+const ENTRY_EDGE_COLOR      = 0x22c55e;
+const EXIT_EDGE_COLOR       = 0xef4444;
+const DISTRICT_PALETTE = [
+  0x1f77b4, 0xff7f0e, 0x2ca02c, 0xd62728, 0x9467bd, 0x8c564b,
+  0xe377c2, 0x7f7f7f, 0xbcbd22, 0x17becf, 0x393b79, 0x637939
+];
 const TRAFFIC_LIGHT_WIDTH = 3;
 const MAX_TRAFFIC_LIGHT_NUM = 2000;
 const NUM_CAR_POOL = 5000;
-const MAX_REPLAY_STEPS = 60; // 1 min of sim; server trims the file before sending
+const SIM_WINDOW_SECONDS = 180; // Backend also runs only this much simulated time
+const DEFAULT_CITY_ID = "city_0001";
+const DEFAULT_SCENARIO = "normal";
+const STORAGE_KEYS = {
+  uiState: "trafficVisualizer.uiState.v1",
+  recentRuns: "trafficVisualizer.recentRuns.v1",
+};
+const MAX_RECENT_RUNS = 12;
 const CAR_LENGTH   = 5;
 const CAR_WIDTH    = 2;
 const LIGHT_RED    = 0xdb635e;
@@ -45,6 +61,7 @@ const CAR_COLORS   = [0xf2bfd7, 0xb7ebe4, 0xdbebb7, 0xf5ddb5, 0xd4b5f5];
 let activeCityId       = null;
 let activeScenario     = null;
 let sharedRoadnetData  = null; // parsed roadnetLogFile.json (static)
+let activeDistrictMap  = null;
 let activeReplayPayloads = []; // cached after last run — used when toggling view modes
 let activePanels       = [];   // SimPanel[]
 let viewLayout         = 1;
@@ -60,6 +77,7 @@ let animFrameId     = null;
 const panelsContainer  = document.getElementById("panels-container");
 const welcomeOverlay   = document.getElementById("welcome-overlay");
 const playbackBar      = document.getElementById("playback-bar");
+const summaryBar       = document.getElementById("summary-bar");
 const pauseBtn         = document.getElementById("pause-btn");
 const scrubber         = document.getElementById("scrubber");
 const stepDisplay      = document.getElementById("step-display");
@@ -68,19 +86,31 @@ const speedDown        = document.getElementById("speed-down");
 const speedUp          = document.getElementById("speed-up");
 // metrics-bar element removed — metrics now live inside each panel overlay
 const progressSection  = document.getElementById("progress-section");
+const debugLogEl       = document.getElementById("debug-log");
+const recentRunsList   = document.getElementById("recent-runs-list");
 const runBtn           = document.getElementById("run-btn");
 const citySelect       = document.getElementById("city-select");
 const scenarioSelect   = document.getElementById("scenario-select");
+const forceRerunCheckbox = document.getElementById("force-rerun-checkbox");
+
+let savedUiState = loadSavedUiState();
+let suppressCityAutoDefault = false;
 
 // ── Initialise page ────────────────────────────────────────────────────────
 
 (async function init() {
+  debugLog(`init start; sim_window=${SIM_WINDOW_SECONDS}s`);
   setupDropZone();
   setupPolicyCheckboxes();
   setupViewModeButtons();
   setupPlaybackControls();
   setupSidebarResize();
+  restoreSavedPolicyState();
+  restoreSavedViewLayout();
+  renderRecentRuns();
   await loadCityList();
+  restoreSavedUiSelections();
+  debugLog("init complete");
 })();
 
 // ── City / scenario pickers ────────────────────────────────────────────────
@@ -89,9 +119,11 @@ async function loadCityList() {
   try {
     const resp = await fetch(`${API_BASE}/cities`);
     const data = await resp.json();
+    debugLog(`loaded cities: ${(data.cities || []).join(", ")}`);
     populateCitySelect(data.cities || []);
   } catch (_) {
     // Server not running yet – leave selects empty.
+    debugLog("failed to load city list");
   }
 }
 
@@ -103,21 +135,31 @@ function populateCitySelect(cities) {
     opt.textContent = c;
     citySelect.appendChild(opt);
   }
+  if (!suppressCityAutoDefault && cities.includes(DEFAULT_CITY_ID)) {
+    citySelect.value = DEFAULT_CITY_ID;
+    citySelect.dispatchEvent(new Event("change"));
+  }
 }
 
 citySelect.addEventListener("change", async () => {
   const city = citySelect.value;
   scenarioSelect.innerHTML = '<option value="">-- loading --</option>';
   scenarioSelect.disabled = true;
+   persistUiState();
   if (!city) return;
   try {
     const resp = await fetch(`${API_BASE}/cities/${city}/scenarios`);
     const data = await resp.json();
+    debugLog(`loaded scenarios for ${city}: ${(data.scenarios || []).join(", ")}`);
     populateScenarioSelect(data.scenarios || []);
   } catch (_) {
     scenarioSelect.innerHTML = '<option value="">-- error --</option>';
+    debugLog(`failed to load scenarios for ${city}`);
   }
 });
+
+scenarioSelect.addEventListener("change", persistUiState);
+forceRerunCheckbox?.addEventListener("change", persistUiState);
 
 function populateScenarioSelect(scenarios) {
   scenarioSelect.innerHTML = '<option value="">-- select scenario --</option>';
@@ -128,6 +170,13 @@ function populateScenarioSelect(scenarios) {
     scenarioSelect.appendChild(opt);
   }
   scenarioSelect.disabled = false;
+  if (savedUiState && savedUiState.city === citySelect.value && scenarios.includes(savedUiState.scenario)) {
+    scenarioSelect.value = savedUiState.scenario;
+    savedUiState = { ...savedUiState, scenario: null };
+  } else if (scenarios.includes(DEFAULT_SCENARIO)) {
+    scenarioSelect.value = DEFAULT_SCENARIO;
+  }
+  persistUiState();
 }
 
 // ── Roadnet upload drop zone ───────────────────────────────────────────────
@@ -215,6 +264,8 @@ function setupPolicyCheckboxes() {
       item.appendChild(tag);
     }
 
+    cb.addEventListener("change", persistUiState);
+
     list.appendChild(item);
   }
 }
@@ -234,6 +285,7 @@ function setupViewModeButtons() {
       document.querySelectorAll(".view-mode-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       viewLayout = parseInt(btn.dataset.panels, 10);
+      persistUiState();
       if (activePanels.length > 0) renderPanelGrid();
     });
   });
@@ -257,6 +309,8 @@ runBtn.addEventListener("click", async () => {
 
   activeCityId   = city;
   activeScenario = scenario;
+  persistUiState();
+  debugLog(`run requested city=${city} scenario=${scenario} policies=${policies.join(", ")}`);
 
   runBtn.disabled = true;
   initProgress(policies);
@@ -269,8 +323,9 @@ runBtn.addEventListener("click", async () => {
     if (cacheResp.ok) {
       const cacheData = await cacheResp.json();
       for (const key of policies) {
-        if (cacheData.metrics && cacheData.metrics[key]) cachedPolicies.add(key);
+        if (cacheData.metrics && cacheData.metrics[key]?.replay_available) cachedPolicies.add(key);
       }
+      debugLog(`cache probe found replay for: ${Array.from(cachedPolicies).join(", ") || "none"}`);
     }
   } catch (_) { /* server may not have any results yet — treat all as uncached */ }
 
@@ -279,39 +334,54 @@ runBtn.addEventListener("click", async () => {
     else markPolicyRunning(p);
   });
 
-  const allResults = await Promise.all(
-    policies.map(async (policy) => {
-      const t0 = Date.now();
-      try {
-        const resp = await fetch(`${API_BASE}/run-simulations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            city_id: city,
-            scenario_name: scenario,
-            policies: [policy],
-            force: document.getElementById("force-rerun-checkbox")?.checked ?? false,
-          }),
-        });
-        if (!resp.ok) {
-          const errData = await resp.json();
-          throw new Error(errData.detail || resp.statusText);
-        }
-        const data = await resp.json();
-        const result = data.results[0];
-        markPolicyDone(policy, Date.now() - t0, result.replay_available ? "done" : "error");
-        return result;
-      } catch (err) {
-        markPolicyDone(policy, Date.now() - t0, "error");
-        return {
-          policy_name: policy,
-          metrics: { error: err.message },
-          replay_available: false,
-          roadnet_log_available: false,
-        };
-      }
-    })
-  );
+  let allResults;
+  try {
+    const resp = await fetch(`${API_BASE}/run-simulations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        city_id: city,
+        scenario_name: scenario,
+        policies,
+        force: document.getElementById("force-rerun-checkbox")?.checked ?? false,
+      }),
+    });
+    if (!resp.ok) {
+      const errData = await resp.json();
+      throw new Error(errData.detail || resp.statusText);
+    }
+    const data = await resp.json();
+    debugLog(`batch run response received: ${data.results?.length || 0} policies`);
+    const resultsByPolicy = new Map((data.results || []).map((result) => [result.policy_name, result]));
+    allResults = policies.map((policy) => {
+      const result = resultsByPolicy.get(policy) || {
+        policy_name: policy,
+        metrics: { error: "Missing policy result from server." },
+        replay_available: false,
+        roadnet_log_available: false,
+        elapsed_ms: null,
+      };
+      const elapsedMs = Number(result.elapsed_ms ?? 0);
+      debugLog(
+        `policy=${policy} replay=${!!result.replay_available} roadnet=${!!result.roadnet_log_available} ` +
+        `elapsed=${(elapsedMs / 1000).toFixed(1)}s`
+      );
+      markPolicyDone(policy, elapsedMs, result.replay_available ? "done" : "error");
+      return result;
+    });
+  } catch (err) {
+    debugLog(`batch run failed: ${err.message}`);
+    allResults = policies.map((policy) => {
+      markPolicyDone(policy, 0, "error");
+      return {
+        policy_name: policy,
+        metrics: { error: err.message },
+        replay_available: false,
+        roadnet_log_available: false,
+        elapsed_ms: 0,
+      };
+    });
+  }
 
   const firstSuccess = allResults.find((r) => r.roadnet_log_available);
   if (!firstSuccess) {
@@ -322,7 +392,32 @@ runBtn.addEventListener("click", async () => {
 
   try {
     await fetchAndStartVisualization(city, scenario, allResults);
+    saveRecentRun({
+      city,
+      scenario,
+      policies,
+      durationsMsByPolicy: Object.fromEntries(
+        allResults.map((result) => [
+          result.policy_name,
+          result.elapsed_ms ?? 0,
+        ])
+      ),
+      replayAvailableByPolicy: Object.fromEntries(
+        allResults.map((result) => [
+          result.policy_name,
+          !!result.replay_available,
+        ])
+      ),
+      metricsByPolicy: Object.fromEntries(
+        allResults.map((result) => [
+          result.policy_name,
+          result.metrics || {},
+        ])
+      ),
+      viewLayout,
+    });
   } catch (err) {
+    debugLog(`visualization failed: ${err.message}`);
     showToast("Error: " + err.message, "error");
   } finally {
     runBtn.disabled = false;
@@ -332,6 +427,7 @@ runBtn.addEventListener("click", async () => {
 // ── Fetch data & start visualization ──────────────────────────────────────
 
 async function fetchAndStartVisualization(city, scenario, policyResults) {
+  debugLog(`viz start city=${city} scenario=${scenario}`);
   stopAnimation();
   destroyAllPanels();
 
@@ -342,6 +438,16 @@ async function fetchAndStartVisualization(city, scenario, policyResults) {
   );
   if (!roadnetResp.ok) throw new Error("Failed to load roadnet log.");
   sharedRoadnetData = await roadnetResp.json();
+  debugLog(`roadnet loaded from policy=${firstPolicy.policy_name}`);
+  activeDistrictMap = null;
+  try {
+    const districtResp = await fetch(`${API_BASE}/cities/${city}/district-map`);
+    if (districtResp.ok) activeDistrictMap = await districtResp.json();
+    debugLog(`district map ${activeDistrictMap ? "loaded" : "missing"}`);
+  } catch (_) {
+    activeDistrictMap = null;
+    debugLog("district map fetch failed");
+  }
   const rn = sharedRoadnetData.static || sharedRoadnetData;
   console.log("[viz] roadnet loaded — nodes:", (rn.node || rn.nodes || []).length, "edges:", (rn.edge || rn.edges || []).length);
 
@@ -349,20 +455,26 @@ async function fetchAndStartVisualization(city, scenario, policyResults) {
   // replay strings in memory simultaneously (each file can be 100s of MB).
   const replayPayloads = [];
   for (const result of policyResults.filter((r) => r.replay_available)) {
+    debugLog(`fetching replay for ${result.policy_name}`);
     const replayResp = await fetch(
-      `${API_BASE}/replay/${city}/${scenario}/${result.policy_name}?max_steps=${MAX_REPLAY_STEPS}`
+      `${API_BASE}/replay/${city}/${scenario}/${result.policy_name}`
     );
     if (!replayResp.ok) {
       console.warn("[viz] replay fetch failed for", result.policy_name, replayResp.status);
       continue;
     }
     const text = await replayResp.text();
-    // Split and immediately discard the raw string (lets GC reclaim it).
-    const lines = text.split("\n").filter((l) => l.trim().length > 0).slice(0, MAX_REPLAY_STEPS);
+    // The backend already ran a 30-second scenario, so consume the full replay as-is.
+    const lines = text.split("\n").filter((l) => l.trim().length > 0);
     console.log(`[viz] replay loaded — policy: ${result.policy_name}, steps: ${lines.length}`);
+    debugLog(`replay loaded for ${result.policy_name}: ${lines.length} steps`);
     replayPayloads.push({ policy_name: result.policy_name, metrics: result.metrics, lines });
   }
   console.log("[viz] replay payloads ready:", replayPayloads.map((p) => `${p.policy_name}(${p.lines.length}steps)`));
+  if (!replayPayloads.length) {
+    throw new Error("No replay data available for the selected policies.");
+  }
+  debugLog(`viz payloads ready: ${replayPayloads.map((p) => `${p.policy_name}(${p.lines.length})`).join(", ")}`);
 
   totalSteps  = Math.min(...replayPayloads.map((p) => p.lines.length));
   globalStep  = 0;
@@ -374,10 +486,174 @@ async function fetchAndStartVisualization(city, scenario, policyResults) {
 
   // Cache for view-mode toggling, then build panels limited by viewLayout.
   activeReplayPayloads = replayPayloads;
+  renderSummaryCards(policyResults);
   renderPanelGrid();
+  debugLog(`rendered ${Math.min(activeReplayPayloads.length, viewLayout)} panel(s)`);
 
   welcomeOverlay.classList.add("hidden");
   startAnimation();
+}
+
+function loadSavedUiState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.uiState) || "null");
+  } catch (_) {
+    return null;
+  }
+}
+
+function persistUiState() {
+  const payload = {
+    city: citySelect.value || null,
+    scenario: scenarioSelect.value || null,
+    policies: getSelectedPolicies(),
+    viewLayout,
+    forceRerun: !!forceRerunCheckbox?.checked,
+  };
+  localStorage.setItem(STORAGE_KEYS.uiState, JSON.stringify(payload));
+}
+
+function restoreSavedPolicyState() {
+  if (!savedUiState || !Array.isArray(savedUiState.policies)) return;
+  for (const key of ALL_POLICY_KEYS) {
+    const cb = document.getElementById(`cb-${key}`);
+    if (!cb || cb.disabled) continue;
+    cb.checked = savedUiState.policies.includes(key);
+  }
+  if (forceRerunCheckbox && typeof savedUiState.forceRerun === "boolean") {
+    forceRerunCheckbox.checked = savedUiState.forceRerun;
+  }
+}
+
+function restoreSavedViewLayout() {
+  if (!savedUiState || !savedUiState.viewLayout) return;
+  const btn = document.querySelector(`.view-mode-btn[data-panels="${savedUiState.viewLayout}"]`);
+  if (btn) btn.click();
+}
+
+function restoreSavedUiSelections() {
+  if (!savedUiState || !savedUiState.city) return;
+  if (!Array.from(citySelect.options).some((opt) => opt.value === savedUiState.city)) return;
+  suppressCityAutoDefault = true;
+  citySelect.value = savedUiState.city;
+  citySelect.dispatchEvent(new Event("change"));
+}
+
+function loadRecentRuns() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.recentRuns) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveRecentRun(run) {
+  const recentRuns = loadRecentRuns();
+  const normalized = {
+    id: `${run.city}__${run.scenario}__${Date.now()}`,
+    city: run.city,
+    scenario: run.scenario,
+    policies: run.policies,
+    durationsMsByPolicy: run.durationsMsByPolicy || {},
+    replayAvailableByPolicy: run.replayAvailableByPolicy || {},
+    metricsByPolicy: run.metricsByPolicy || {},
+    viewLayout: run.viewLayout || 1,
+    savedAt: new Date().toISOString(),
+  };
+  const nextRuns = [normalized, ...recentRuns].slice(0, MAX_RECENT_RUNS);
+  localStorage.setItem(STORAGE_KEYS.recentRuns, JSON.stringify(nextRuns));
+  renderRecentRuns();
+}
+
+function renderRecentRuns() {
+  if (!recentRunsList) return;
+  const recentRuns = loadRecentRuns();
+  recentRunsList.innerHTML = "";
+  if (!recentRuns.length) {
+    recentRunsList.innerHTML = '<div class="recent-run-empty">No saved runs yet.</div>';
+    return;
+  }
+  for (const run of recentRuns) {
+    const card = document.createElement("div");
+    card.className = "recent-run-card";
+    const totalMs = Object.values(run.durationsMsByPolicy || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    const policiesHtml = (run.policies || [])
+      .map((policy) => {
+        const meta = POLICY_META[policy];
+        const label = meta ? meta.label : policy;
+        const seconds = Number(run.durationsMsByPolicy?.[policy] || 0) / 1000;
+        return `<span class="recent-run-chip">${label} · ${seconds.toFixed(1)}s</span>`;
+      })
+      .join("");
+    card.innerHTML = `
+      <div class="recent-run-top">
+        <div class="recent-run-title">${run.city} / ${run.scenario}</div>
+        <div class="recent-run-time">${formatSavedAt(run.savedAt)}</div>
+      </div>
+      <div class="recent-run-meta">Total runtime: ${(totalMs / 1000).toFixed(1)}s</div>
+      <div class="recent-run-policies">${policiesHtml}</div>
+      <div class="recent-run-actions">
+        <button class="recent-run-btn" data-action="restore">Restore</button>
+        <button class="recent-run-btn" data-action="open-cache">Open Cached</button>
+      </div>
+    `;
+    card.querySelector('[data-action="restore"]').addEventListener("click", () => restoreRecentRun(run, false));
+    card.querySelector('[data-action="open-cache"]').addEventListener("click", () => restoreRecentRun(run, true));
+    recentRunsList.appendChild(card);
+  }
+}
+
+async function restoreRecentRun(run, openCached) {
+  savedUiState = {
+    city: run.city,
+    scenario: run.scenario,
+    policies: run.policies || [],
+    viewLayout: run.viewLayout || 1,
+    forceRerun: false,
+  };
+  restoreSavedPolicyState();
+  restoreSavedViewLayout();
+  suppressCityAutoDefault = true;
+  if (Array.from(citySelect.options).some((opt) => opt.value === run.city)) {
+    citySelect.value = run.city;
+    await citySelect.dispatchEvent(new Event("change"));
+  }
+  persistUiState();
+  if (!openCached) return;
+  try {
+    const metricsResp = await fetch(`${API_BASE}/metrics/${run.city}/${run.scenario}`);
+    if (!metricsResp.ok) throw new Error("Cached metrics not found.");
+    const metricsData = await metricsResp.json();
+    const policyResults = (run.policies || [])
+      .filter((policy) => metricsData.metrics && metricsData.metrics[policy]?.replay_available)
+      .map((policy) => ({
+        policy_name: policy,
+        metrics: metricsData.metrics[policy],
+        replay_available: !!metricsData.metrics[policy]?.replay_available,
+        roadnet_log_available: !!metricsData.metrics[policy]?.roadnet_log_available,
+        elapsed_ms: Number(run.durationsMsByPolicy?.[policy] || 0),
+      }));
+    if (!policyResults.length) {
+      showToast("No cached run data found for this selection.", "warn");
+      return;
+    }
+    await fetchAndStartVisualization(run.city, run.scenario, policyResults);
+  } catch (err) {
+    showToast(`Failed to open cached run: ${err.message}`, "error");
+  }
+}
+
+function formatSavedAt(savedAt) {
+  if (!savedAt) return "saved";
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) return "saved";
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 // ── Panel grid ─────────────────────────────────────────────────────────────
@@ -392,7 +668,7 @@ function renderPanelGrid() {
   const toShow = activeReplayPayloads.slice(0, viewLayout);
   for (const payload of toShow) {
     const panel = new SimPanel(payload);
-    panel.init(sharedRoadnetData);
+    panel.init(sharedRoadnetData, activeDistrictMap);
     panelsContainer.appendChild(panel.element);
     activePanels.push(panel);
   }
@@ -406,6 +682,69 @@ function destroyAllPanels() {
   for (const p of activePanels) p.destroy();
   activePanels = [];
   panelsContainer.innerHTML = "";
+}
+
+function renderSummaryCards(policyResults) {
+  if (!summaryBar) return;
+  summaryBar.innerHTML = "";
+  if (!policyResults || !policyResults.length) {
+    summaryBar.innerHTML = '<div class="summary-empty">Run a simulation to compare policy metrics.</div>';
+    return;
+  }
+
+  const baseline = policyResults.find((result) => result.policy_name === "learned") || policyResults[0];
+  for (const result of policyResults) {
+    const meta = POLICY_META[result.policy_name] || { label: result.policy_name, color: 0x888888 };
+    const metrics = result.metrics || {};
+    const card = document.createElement("div");
+    card.className = "summary-card";
+    card.style.setProperty("--summary-color", `#${meta.color.toString(16).padStart(6, "0")}`);
+
+    const queue = pickMetric(metrics, ["mean_waiting_vehicles", "avg_queue"]);
+    const throughput = pickMetric(metrics, ["throughput"]);
+    const travelTime = pickMetric(metrics, ["average_travel_time", "travel_time"]);
+    const totalReturn = pickMetric(metrics, ["total_episode_return", "total_return", "episode_return"]);
+    const activePct = pickMetric(metrics, ["percent_steps_with_active_guidance"]);
+
+    const queueDelta = baseline === result ? null : diffMetric(queue, pickMetric(baseline.metrics || {}, ["mean_waiting_vehicles", "avg_queue"]), true);
+    const throughputDelta = baseline === result ? null : diffMetric(throughput, pickMetric(baseline.metrics || {}, ["throughput"]), false);
+
+    card.innerHTML = `
+      <div class="summary-card-header">
+        <div class="summary-card-title">${meta.label}</div>
+        <div class="summary-card-subtitle">${result.policy_name}</div>
+      </div>
+      <div class="summary-grid">
+        <div>
+          <div class="summary-stat-label">Return</div>
+          <div class="summary-stat-value">${formatMetric(totalReturn, 2)}</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Queue</div>
+          <div class="summary-stat-value">${formatMetric(queue, 1)}</div>
+          ${queueDelta ? `<div class="summary-delta ${queueDelta.className}">${queueDelta.label}</div>` : ""}
+        </div>
+        <div>
+          <div class="summary-stat-label">Throughput</div>
+          <div class="summary-stat-value">${formatMetric(throughput, 0)}</div>
+          ${throughputDelta ? `<div class="summary-delta ${throughputDelta.className}">${throughputDelta.label}</div>` : ""}
+        </div>
+        <div>
+          <div class="summary-stat-label">Travel Time</div>
+          <div class="summary-stat-value">${formatMetric(travelTime, 1)}</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Guidance Active</div>
+          <div class="summary-stat-value">${activePct == null ? "—" : `${(activePct * 100).toFixed(0)}%`}</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Runtime</div>
+          <div class="summary-stat-value">${formatDuration(result.elapsed_ms)}</div>
+        </div>
+      </div>
+    `;
+    summaryBar.appendChild(card);
+  }
 }
 
 // ── SimPanel class ─────────────────────────────────────────────────────────
@@ -428,14 +767,16 @@ class SimPanel {
     this.canvasWrapper = null;
     this.renderer   = null;
     this.simulatorContainer = null;
+    this.overlayContainer = null;
+    this.legendEl = null;
     this._ready     = false;
   }
 
   get meta() { return POLICY_META[this.policyName] || { label: this.policyName, color: 0x888888 }; }
 
-  init(roadnetData) {
+  init(roadnetData, districtMap) {
     this._buildElement();
-    this._initPixi(roadnetData);
+    this._initPixi(roadnetData, districtMap);
   }
 
   _buildElement() {
@@ -508,11 +849,22 @@ class SimPanel {
     }
     this.canvasWrapper.appendChild(overlay);
 
+    this.legendEl = document.createElement("div");
+    this.legendEl.className = "panel-map-legend hidden";
+    this.legendEl.innerHTML = `
+      <div class="panel-map-legend-title">Map</div>
+      <div class="panel-map-legend-row"><span class="panel-map-swatch districts"></span><span>Districts</span></div>
+      <div class="panel-map-legend-row"><span class="panel-map-swatch entry"></span><span>Entry roads</span></div>
+      <div class="panel-map-legend-row"><span class="panel-map-swatch exit"></span><span>Exit roads</span></div>
+      <div class="panel-map-legend-row"><span class="panel-map-swatch gateway"></span><span>Gateway nodes</span></div>
+    `;
+    this.canvasWrapper.appendChild(this.legendEl);
+
     this.element.appendChild(header);
     this.element.appendChild(this.canvasWrapper);
   }
 
-  _initPixi(roadnetData) {
+  _initPixi(roadnetData, districtMap) {
     const wrapper = this.canvasWrapper;
 
     // Defer to next frame so the DOM element has dimensions.
@@ -533,7 +885,7 @@ class SimPanel {
       wrapper.appendChild(this.app.view);
 
       this.renderer = this.app.renderer;
-      this._drawRoadnet(roadnetData);
+      this._drawRoadnet(roadnetData, districtMap);
 
       // Remove spinner.
       const spinner = wrapper.querySelector(".panel-spinner");
@@ -543,7 +895,7 @@ class SimPanel {
     });
   }
 
-  _drawRoadnet(roadnetJson) {
+  _drawRoadnet(roadnetJson, districtMap) {
     this.nodes = {};
     this.edges = {};
     this.trafficLightsG = {};
@@ -590,6 +942,11 @@ class SimPanel {
     }
     for (const edgeId in this.edges) {
       this._drawEdge(this.edges[edgeId], mapGraphics);
+    }
+
+    this._drawOverlayLayers(districtMap);
+    if (this.legendEl) {
+      this.legendEl.classList.toggle("hidden", !districtMap);
     }
 
     const bounds = this.simulatorContainer.getBounds();
@@ -695,6 +1052,89 @@ class SimPanel {
         pointA1.x, pointA1.y,
       ]);
       graphics.endFill();
+    }
+  }
+
+  _drawOverlayLayers(districtMap) {
+    if (this.overlayContainer) {
+      this.overlayContainer.destroy(true);
+      this.overlayContainer = null;
+    }
+    if (!districtMap || !districtMap.intersection_to_district) return;
+
+    this.overlayContainer = new PIXI.Container();
+    this.simulatorContainer.addChild(this.overlayContainer);
+
+    const overlayGraphics = new PIXI.Graphics();
+    this.overlayContainer.addChild(overlayGraphics);
+
+    const intersectionToDistrict = districtMap.intersection_to_district || {};
+    const gatewayNodeIds = new Set(districtMap.gateway_intersections || []);
+    const gatewayEdgeIds = new Set(districtMap.gateway_roads || []);
+    const entryRoadIds = new Set();
+    const exitRoadIds = new Set();
+    for (const district of districtMap.districts || []) {
+      for (const roadId of district.entry_roads || []) entryRoadIds.add(roadId);
+      for (const roadId of district.exit_roads || []) exitRoadIds.add(roadId);
+    }
+
+    const districtToPoints = {};
+    for (const nodeId in this.nodes) {
+      const districtId = intersectionToDistrict[nodeId];
+      if (!districtId) continue;
+      if (!districtToPoints[districtId]) districtToPoints[districtId] = [];
+      districtToPoints[districtId].push(this.nodes[nodeId].point);
+    }
+    drawDistrictRegionFills(overlayGraphics, districtToPoints);
+
+    for (const edgeId in this.edges) {
+      const edge = this.edges[edgeId];
+      const fromDistrict = intersectionToDistrict[edge.from.id];
+      const toDistrict = intersectionToDistrict[edge.to.id];
+      if (fromDistrict && toDistrict) {
+        if (fromDistrict === toDistrict) {
+          drawEdgePolyline(overlayGraphics, edge, 1.2, getDistrictColor(fromDistrict), 0.35);
+        } else {
+          drawEdgePolyline(overlayGraphics, edge, 1.8, DISTRICT_BORDER_COLOR, 0.55);
+        }
+      }
+
+      const fromGateway = gatewayNodeIds.has(edge.from.id) || String(edge.from.id).startsWith("g_");
+      const toGateway = gatewayNodeIds.has(edge.to.id) || String(edge.to.id).startsWith("g_");
+      const looksGateway = gatewayEdgeIds.has(edgeId) || String(edgeId).includes("_g_") || String(edgeId).startsWith("r_g_");
+      if (!fromGateway && !toGateway && !looksGateway) continue;
+
+      const isEntry = entryRoadIds.has(edgeId) || (fromGateway && !toGateway);
+      const isExit = exitRoadIds.has(edgeId) || (!fromGateway && toGateway);
+      const color = isEntry ? ENTRY_EDGE_COLOR : (isExit ? EXIT_EDGE_COLOR : GATEWAY_EDGE_COLOR);
+      const width = isEntry || isExit ? 5.2 : 4.0;
+      const alpha = isEntry || isExit ? 0.72 : 0.56;
+      drawEdgePolyline(overlayGraphics, edge, width, color, alpha);
+    }
+
+    for (const nodeId in this.nodes) {
+      const districtId = intersectionToDistrict[nodeId];
+      if (districtId) {
+        const point = this.nodes[nodeId].point;
+        overlayGraphics.beginFill(getDistrictColor(districtId), 0.48);
+        overlayGraphics.drawCircle(point.x, point.y, 2.0);
+        overlayGraphics.endFill();
+      }
+      if (gatewayNodeIds.has(nodeId) || String(nodeId).startsWith("g_")) {
+        const point = this.nodes[nodeId].point;
+        overlayGraphics.lineStyle(0);
+        overlayGraphics.beginFill(GATEWAY_NODE_COLOR, 0.22);
+        overlayGraphics.drawCircle(point.x, point.y, 26.0);
+        overlayGraphics.endFill();
+        overlayGraphics.lineStyle(2.0, 0x1f2937, 0.95);
+        overlayGraphics.beginFill(GATEWAY_NODE_COLOR, 0.9);
+        overlayGraphics.drawCircle(point.x, point.y, 9.0);
+        overlayGraphics.endFill();
+        overlayGraphics.lineStyle(0);
+        overlayGraphics.beginFill(0xffffff, 0.9);
+        overlayGraphics.drawCircle(point.x, point.y, 3.6);
+        overlayGraphics.endFill();
+      }
     }
   }
 
@@ -966,6 +1406,75 @@ function transCoord(point) {
   return [point.x, -point.y];
 }
 
+function getDistrictColor(districtId) {
+  return DISTRICT_PALETTE[stringHash(districtId) % DISTRICT_PALETTE.length];
+}
+
+function cross2D(o, a, b) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+function convexHull(points) {
+  if (!points || points.length <= 2) return points ? points.slice() : [];
+  const sorted = points
+    .slice()
+    .sort((p, q) => (p.x === q.x ? p.y - q.y : p.x - q.x));
+  const lower = [];
+  for (const point of sorted) {
+    while (lower.length >= 2 && cross2D(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const point = sorted[i];
+    while (upper.length >= 2 && cross2D(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function drawDistrictRegionFills(graphics, districtToPoints) {
+  for (const districtId in districtToPoints) {
+    const pts = districtToPoints[districtId];
+    if (!pts || pts.length === 0) continue;
+    const color = getDistrictColor(districtId);
+    if (pts.length >= 3) {
+      const hull = convexHull(pts);
+      if (hull.length >= 3) {
+        graphics.lineStyle(1.2, color, 0.28);
+        graphics.beginFill(color, 0.09);
+        graphics.moveTo(hull[0].x, hull[0].y);
+        for (let i = 1; i < hull.length; i++) graphics.lineTo(hull[i].x, hull[i].y);
+        graphics.lineTo(hull[0].x, hull[0].y);
+        graphics.endFill();
+        continue;
+      }
+    }
+    if (pts.length === 2) {
+      graphics.lineStyle(16, color, 0.08);
+      graphics.drawLine(pts[0], pts[1]);
+      continue;
+    }
+    graphics.lineStyle(0);
+    graphics.beginFill(color, 0.1);
+    graphics.drawCircle(pts[0].x, pts[0].y, 16);
+    graphics.endFill();
+  }
+}
+
+function drawEdgePolyline(graphics, edge, width, color, alpha) {
+  graphics.lineStyle(width, color, alpha);
+  for (let i = 1; i < edge.points.length; i++) {
+    graphics.drawLine(edge.points[i - 1], edge.points[i]);
+  }
+}
+
 function stringHash(str) {
   let hash = 0, p = 127, pp = 1, m = 1e9 + 9;
   for (let i = 0; i < str.length; i++) {
@@ -999,6 +1508,47 @@ function showToast(msg, type = "info") {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
+}
+
+function pickMetric(metrics, keys) {
+  for (const key of keys) {
+    const value = metrics?.[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function formatMetric(value, digits = 1) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return Number(value).toFixed(digits);
+}
+
+function formatDuration(elapsedMs) {
+  const seconds = Number(elapsedMs || 0) / 1000;
+  return `${seconds.toFixed(1)}s`;
+}
+
+function diffMetric(value, baseline, lowerIsBetter) {
+  if (value == null || baseline == null) return null;
+  const delta = value - baseline;
+  const good = lowerIsBetter ? delta < 0 : delta > 0;
+  const neutral = Math.abs(delta) < 1e-9;
+  return {
+    className: neutral ? "neutral" : (good ? "good" : "bad"),
+    label: `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} vs DQN`,
+  };
+}
+
+function debugLog(message) {
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+  console.log("[frontend]", message);
+  if (!debugLogEl) return;
+  const entry = document.createElement("div");
+  entry.textContent = line;
+  debugLogEl.prepend(entry);
+  while (debugLogEl.childNodes.length > 80) {
+    debugLogEl.removeChild(debugLogEl.lastChild);
+  }
 }
 
 // Extend PIXI.Graphics with drawLine if not already present.

@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -114,13 +115,29 @@ async def lifespan(app: FastAPI):
                 exc,
             )
     else:
-        from server.policy_runner import load_dqn_checkpoint
+        from server.policy_runner import load_district_llm_inference, load_dqn_checkpoint
         if CHECKPOINT_PATH.exists():
             load_dqn_checkpoint(CHECKPOINT_PATH)
         else:
             logger.warning("Checkpoint not found at %s — 'learned' policy will fail", CHECKPOINT_PATH)
+        try:
+            load_district_llm_inference()
+        except Exception as exc:
+            logger.warning(
+                "District LLM prewarm failed: %s. "
+                "The llm_dqn policy will retry loading lazily on first use.",
+                exc,
+            )
 
     yield
+
+    if not OPENENV_API_URL:
+        from server.policy_runner import unload_district_llm_inference
+
+        try:
+            unload_district_llm_inference()
+        except Exception as exc:
+            logger.warning("District LLM unload failed during shutdown: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +177,7 @@ class PolicyMetrics(BaseModel):
     metrics: dict[str, Any]
     replay_available: bool
     roadnet_log_available: bool
+    elapsed_ms: float | None = None
 
 
 class RunSimulationsResponse(BaseModel):
@@ -219,6 +237,18 @@ def get_scenarios(city_id: str) -> dict:
     return {"city_id": city_id, "scenarios": scenarios}
 
 
+@app.get("/cities/{city_id}/district-map")
+def get_district_map(city_id: str) -> JSONResponse:
+    validate_path_segment(city_id, "city_id")
+    district_map_path = GENERATED_ROOT / city_id / "district_map.json"
+    if not district_map_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"District map not found for city '{city_id}'.",
+        )
+    return JSONResponse(json.loads(district_map_path.read_text(encoding="utf-8")))
+
+
 @app.post("/run-simulations", response_model=RunSimulationsResponse)
 def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
     validate_path_segment(request.city_id, "city_id")
@@ -233,6 +263,7 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
         )
 
     def _run_one(policy_name: str) -> PolicyMetrics:
+        started_at = time.perf_counter()
         output_dir = REPLAY_OUTPUT_ROOT / request.city_id / request.scenario_name / policy_name
         replay_path = output_dir / "replay.txt"
         roadnet_path = output_dir / "roadnetLogFile.json"
@@ -244,6 +275,7 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
                 metrics=json.loads(metrics_path.read_text(encoding="utf-8")),
                 replay_available=True,
                 roadnet_log_available=roadnet_path.exists(),
+                elapsed_ms=0.0,
             )
 
         try:
@@ -257,6 +289,7 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
                 metrics=result.metrics,
                 replay_available=result.replay_path.exists(),
                 roadnet_log_available=result.roadnet_log_path.exists(),
+                elapsed_ms=(time.perf_counter() - started_at) * 1000.0,
             )
         except Exception as exc:
             logger.error("Policy run failed for %s/%s/%s: %s", request.city_id, request.scenario_name, policy_name, exc)
@@ -265,6 +298,7 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
                 metrics={"error": "Simulation failed. Check server logs."},
                 replay_available=False,
                 roadnet_log_available=False,
+                elapsed_ms=(time.perf_counter() - started_at) * 1000.0,
             )
 
     n_jobs = min(len(request.policies), 4)
@@ -347,10 +381,16 @@ def get_metrics(city_id: str, scenario_name: str) -> dict:
             continue
         metrics_path = policy_dir / "metrics.json"
         replay_path = policy_dir / "replay.txt"
+        roadnet_log_path = policy_dir / "roadnetLogFile.json"
+        payload: dict[str, Any] = {}
         if metrics_path.exists():
-            metrics[policy_dir.name] = json.loads(metrics_path.read_text(encoding="utf-8"))
-        elif replay_path.exists():
-            metrics[policy_dir.name] = {"replay_available": True}
+            payload.update(json.loads(metrics_path.read_text(encoding="utf-8")))
+        if replay_path.exists():
+            payload["replay_available"] = True
+        if roadnet_log_path.exists():
+            payload["roadnet_log_available"] = True
+        if payload:
+            metrics[policy_dir.name] = payload
 
     return {"city_id": city_id, "scenario_name": scenario_name, "metrics": metrics}
 
