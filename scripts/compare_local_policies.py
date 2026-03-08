@@ -13,7 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from agents.local_policy import FixedCyclePolicy, RandomPhasePolicy
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 from training.device import configure_torch_runtime, resolve_torch_device
 from training.models import RunningNormalizer, TrafficControlQNetwork
 from training.rollout import evaluate_policy

@@ -16,3 +16,5 @@ CMakeSettings.json
 cmake-build-*
 CityFlow.egg-info
 frontend/replay/*
+notebooks/unsloth_compiled_cache
+artifacts/*

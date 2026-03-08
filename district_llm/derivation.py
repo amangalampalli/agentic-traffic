@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from district_llm.repair import fallback_target_intersections
 from district_llm.schema import DistrictAction, DistrictStateSummary
 
 
@@ -48,6 +49,7 @@ def derive_district_action(
     window_data: DistrictWindowData,
     controller_actions: list[LocalIntersectionAction] | None = None,
     district_state: DistrictStateSummary | None = None,
+    max_target_intersections: int = 3,
 ) -> DistrictAction:
     """
     Deterministic first-pass label extraction from local-controller behavior.
@@ -100,20 +102,26 @@ def derive_district_action(
     if phase_bias == "NONE" and state.dominant_flow in {"NS", "EW"}:
         phase_bias = state.dominant_flow
 
-    target_intersections = [
-        intersection_id
-        for intersection_id, _ in sorted(
-            focus_scores.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )[:3]
-    ]
-    if not target_intersections:
-        target_intersections = [
-            item.intersection_id for item in state.top_congested_intersections[:3]
-        ]
+    def select_targets(
+        strategy: str,
+        priority_corridor: str | None,
+        selected_phase_bias: str,
+    ) -> list[str]:
+        return fallback_target_intersections(
+            summary=state,
+            max_target_intersections=max_target_intersections,
+            strategy=strategy,
+            priority_corridor=priority_corridor,
+            phase_bias=selected_phase_bias,
+            focus_scores=focus_scores,
+        )
 
     if state.incident_flag or end_state.incident_flag:
+        target_intersections = select_targets(
+            strategy="incident_response",
+            priority_corridor=phase_bias if phase_bias in {"NS", "EW"} else "arterial",
+            selected_phase_bias=phase_bias,
+        )
         return DistrictAction(
             strategy="incident_response",
             priority_corridor=phase_bias if phase_bias in {"NS", "EW"} else "arterial",
@@ -123,15 +131,26 @@ def derive_district_action(
         ).validate()
 
     if state.spillback_risk or end_state.spillback_risk or (boundary_share >= 0.55 and outgoing_pressure >= 0.45):
+        priority_corridor = "inbound" if boundary_share >= 0.55 else phase_bias if phase_bias in {"NS", "EW"} else None
+        target_intersections = select_targets(
+            strategy="clear_spillback",
+            priority_corridor=priority_corridor,
+            selected_phase_bias=phase_bias,
+        )
         return DistrictAction(
             strategy="clear_spillback",
-            priority_corridor="inbound" if boundary_share >= 0.55 else phase_bias if phase_bias in {"NS", "EW"} else None,
+            priority_corridor=priority_corridor,
             target_intersections=target_intersections,
             phase_bias=phase_bias,
             duration_steps=duration_steps,
         ).validate()
 
     if boundary_share >= 0.55 and (queue_delta >= 0.0 or wait_delta >= 0.0):
+        target_intersections = select_targets(
+            strategy="drain_inbound",
+            priority_corridor="inbound",
+            selected_phase_bias=phase_bias,
+        )
         return DistrictAction(
             strategy="drain_inbound",
             priority_corridor="inbound",
@@ -141,6 +160,11 @@ def derive_district_action(
         ).validate()
 
     if outgoing_pressure >= 0.65 and end_state.total_queue >= state.total_queue * 0.9:
+        target_intersections = select_targets(
+            strategy="drain_outbound",
+            priority_corridor="outbound",
+            selected_phase_bias=phase_bias,
+        )
         return DistrictAction(
             strategy="drain_outbound",
             priority_corridor="outbound",
@@ -155,9 +179,15 @@ def derive_district_action(
         or end_state.overload_flag
         or (boundary_focus_ratio >= 0.6 and switch_count >= max(2, duration_steps))
     ):
+        priority_corridor = phase_bias if phase_bias in {"NS", "EW"} else "arterial"
+        target_intersections = select_targets(
+            strategy="arterial_priority",
+            priority_corridor=priority_corridor,
+            selected_phase_bias=phase_bias,
+        )
         return DistrictAction(
             strategy="arterial_priority",
-            priority_corridor=phase_bias if phase_bias in {"NS", "EW"} else "arterial",
+            priority_corridor=priority_corridor,
             target_intersections=target_intersections,
             phase_bias=phase_bias,
             duration_steps=duration_steps,
@@ -168,6 +198,11 @@ def derive_district_action(
     imbalance_threshold = max(5.0, 0.15 * max(1.0, ns_pressure + ew_pressure))
 
     if ns_pressure - ew_pressure >= imbalance_threshold:
+        target_intersections = select_targets(
+            strategy="favor_NS",
+            priority_corridor="NS",
+            selected_phase_bias="NS",
+        )
         return DistrictAction(
             strategy="favor_NS",
             priority_corridor="NS",
@@ -177,6 +212,11 @@ def derive_district_action(
         ).validate()
 
     if ew_pressure - ns_pressure >= imbalance_threshold:
+        target_intersections = select_targets(
+            strategy="favor_EW",
+            priority_corridor="EW",
+            selected_phase_bias="EW",
+        )
         return DistrictAction(
             strategy="favor_EW",
             priority_corridor="EW",

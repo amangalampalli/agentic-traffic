@@ -9,7 +9,7 @@ from env.intersection_config import DISTRICT_TYPES
 from env.observation_builder import ObservationConfig
 from env.reward import REWARD_VARIANTS, RewardConfig
 from env.traffic_env import EnvConfig
-from training.dataset import CityFlowDataset
+from training.cityflow_dataset import CityFlowDataset
 from training.models import POLICY_ARCHES
 
 

@@ -4,7 +4,7 @@ import argparse
 import json
 import statistics
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,8 +29,8 @@ except ImportError:  # pragma: no cover
     tqdm = None
 
 
-DEFAULT_OUTPUT_DIR = "data/district_llm_dataset_v2"
-SCHEMA_VERSION = "district_action_v1_messages_v2_candidates"
+DEFAULT_OUTPUT_DIR = "data/district_llm_dataset_v3"
+SCHEMA_VERSION = "district_action_v1_messages_v3_candidates"
 
 
 @dataclass(frozen=True)
@@ -42,11 +42,11 @@ class CollectionResult:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate a medium-sized district-LLM chat dataset with diagnostics."
+        description="Generate a large, candidate-constrained district-LLM chat dataset."
     )
-    parser.add_argument("--num-train", type=int, default=3000)
-    parser.add_argument("--num-val", type=int, default=500)
-    parser.add_argument("--cities", type=int, default=8)
+    parser.add_argument("--num-train", type=int, default=10000)
+    parser.add_argument("--num-val", type=int, default=2500)
+    parser.add_argument("--cities", type=int, default=12)
     parser.add_argument(
         "--scenarios",
         default="all",
@@ -128,29 +128,44 @@ def parse_scenarios(raw_value: str) -> set[str] | None:
     return {item.strip() for item in raw_value.split(",") if item.strip()}
 
 
-def build_scenario_specs(
+def build_balanced_scenario_specs(
     dataset: CityFlowDataset,
     split_name: str,
     max_cities: int,
     allowed_scenarios: set[str] | None,
 ) -> list[Any]:
-    scenario_order = {name: index for index, name in enumerate(DEFAULT_SCENARIOS)}
-    scenario_specs = []
+    grouped: dict[str, list[Any]] = defaultdict(list)
     city_ids = dataset.load_split(split_name)[:max_cities]
+    scenario_order = {name: index for index, name in enumerate(DEFAULT_SCENARIOS)}
+
     for city_id in city_ids:
         for scenario_name in dataset.scenarios_for_city(city_id):
             if allowed_scenarios is not None and scenario_name not in allowed_scenarios:
                 continue
-            scenario_specs.append(dataset.build_scenario_spec(city_id, scenario_name))
-    if not scenario_specs:
+            grouped[scenario_name].append(dataset.build_scenario_spec(city_id, scenario_name))
+
+    if not grouped:
         raise ValueError(f"No scenario specs found for split={split_name}.")
-    return sorted(
-        scenario_specs,
-        key=lambda spec: (
-            scenario_order.get(spec.scenario_name, len(DEFAULT_SCENARIOS)),
-            spec.city_id,
-        ),
+
+    for specs in grouped.values():
+        specs.sort(key=lambda spec: spec.city_id)
+
+    scenario_names = sorted(
+        grouped,
+        key=lambda name: (scenario_order.get(name, len(DEFAULT_SCENARIOS)), name),
     )
+    interleaved: list[Any] = []
+    pending = True
+    round_index = 0
+    while pending:
+        pending = False
+        for scenario_name in scenario_names:
+            specs = grouped[scenario_name]
+            if round_index < len(specs):
+                interleaved.append(specs[round_index])
+                pending = True
+        round_index += 1
+    return interleaved
 
 
 def extract_summary_text(prompt: str) -> str:
@@ -214,7 +229,14 @@ def validate_row(row: dict[str, Any]) -> None:
     if not messages[1]["content"].strip():
         raise ValueError("User summary content is empty.")
     payload = json.loads(messages[2]["content"])
-    DistrictAction.from_dict(payload)
+    action = DistrictAction.from_dict(payload)
+    visible_candidates = {
+        str(item.get("intersection_id"))
+        for item in row.get("candidate_intersections", [])
+        if str(item.get("intersection_id", "")).strip()
+    }
+    if visible_candidates and any(item not in visible_candidates for item in action.target_intersections):
+        raise ValueError("target_intersections must remain inside candidate_intersections.")
 
 
 def row_key(row: dict[str, Any]) -> str:
@@ -238,7 +260,7 @@ def collect_split_rows(
     duplicate_rows_removed = 0
     low_signal_rows_removed = 0
     episode_index = 0
-    max_rounds = max(target_rows * 3, len(scenario_specs) * 25)
+    max_rounds = max(target_rows * 3, len(scenario_specs) * 40)
     progress = (
         tqdm(total=target_rows, desc=f"{split_name} rows", dynamic_ncols=True)
         if tqdm is not None
@@ -330,8 +352,8 @@ def build_split_diagnostics(result: CollectionResult) -> dict[str, Any]:
     assistant_payloads = [json.loads(row["messages"][2]["content"]) for row in rows]
     summary_lengths = [len(row["messages"][1]["content"]) for row in rows]
     assistant_lengths = [len(row["messages"][2]["content"]) for row in rows]
-    target_counts = [len(payload.get("target_intersections", [])) for payload in assistant_payloads]
     candidate_counts = [len(row.get("candidate_intersections", [])) for row in rows]
+    target_counts = [len(payload.get("target_intersections", [])) for payload in assistant_payloads]
     assistant_uniqueness = (
         len({row["messages"][2]["content"] for row in rows}) / len(rows)
         if rows
@@ -351,6 +373,14 @@ def build_split_diagnostics(result: CollectionResult) -> dict[str, Any]:
             "average": average(assistant_lengths),
             "median": median(assistant_lengths),
         },
+        "candidate_pool_size": {
+            "average": average(candidate_counts),
+            "median": median(candidate_counts),
+        },
+        "target_intersections_count": {
+            "average": average(target_counts),
+            "median": median(target_counts),
+        },
         "strategy_distribution": counter_dict([payload["strategy"] for payload in assistant_payloads]),
         "priority_corridor_distribution": counter_dict(
             [str(payload.get("priority_corridor")) for payload in assistant_payloads]
@@ -359,14 +389,9 @@ def build_split_diagnostics(result: CollectionResult) -> dict[str, Any]:
         "duration_steps_distribution": counter_dict(
             [str(payload["duration_steps"]) for payload in assistant_payloads]
         ),
-        "candidate_intersections_count": {
-            "average": average(candidate_counts),
-            "median": median(candidate_counts),
-        },
-        "average_target_intersections": average(target_counts),
         "assistant_uniqueness_ratio": assistant_uniqueness,
-        "duplicate_row_count_removed": result.duplicate_rows_removed,
-        "low_signal_row_count_removed": result.low_signal_rows_removed,
+        "duplicate_rows_removed": result.duplicate_rows_removed,
+        "low_signal_rows_removed": result.low_signal_rows_removed,
     }
 
 
@@ -376,20 +401,24 @@ def aggregate_metadata(
     teachers: list[BaseTeacher],
 ) -> dict[str, Any]:
     all_rows = train_result.rows + val_result.rows
-    train_stats = build_split_diagnostics(train_result)
-    val_stats = build_split_diagnostics(val_result)
+    all_assistant_payloads = [json.loads(row["messages"][2]["content"]) for row in all_rows]
+    all_candidate_counts = [len(row.get("candidate_intersections", [])) for row in all_rows]
+    all_target_counts = [len(payload.get("target_intersections", [])) for payload in all_assistant_payloads]
     return {
         "num_train_rows": len(train_result.rows),
         "num_val_rows": len(val_result.rows),
         "generation_timestamp": datetime.now(timezone.utc).isoformat(),
         "schema_version": SCHEMA_VERSION,
         "teacher_sources": [teacher.metadata.to_dict() for teacher in teachers],
+        "rows_per_city": counter_dict([row["city_id"] for row in all_rows]),
         "rows_per_scenario": counter_dict([row["scenario"] for row in all_rows]),
         "rows_per_district_type": counter_dict([row["district_type"] for row in all_rows]),
-        "rows_per_city": counter_dict([row["city_id"] for row in all_rows]),
         "controller_family_counts": counter_dict([row["controller_family"] for row in all_rows]),
-        "train_stats": train_stats,
-        "val_stats": val_stats,
+        "average_candidate_intersections_count": average(all_candidate_counts),
+        "average_target_intersections_count": average(all_target_counts),
+        "duplicate_rows_removed": train_result.duplicate_rows_removed + val_result.duplicate_rows_removed,
+        "train_stats": build_split_diagnostics(train_result),
+        "val_stats": build_split_diagnostics(val_result),
     }
 
 
@@ -400,6 +429,11 @@ def print_split_diagnostics(split_name: str, stats: dict[str, Any]) -> None:
     print(f"[{split_name}] rows_per_city={json.dumps(stats['rows_per_city'], sort_keys=True)}")
     print(f"[{split_name}] summary_length={json.dumps(stats['summary_length'], sort_keys=True)}")
     print(f"[{split_name}] assistant_json_length={json.dumps(stats['assistant_json_length'], sort_keys=True)}")
+    print(f"[{split_name}] candidate_pool_size={json.dumps(stats['candidate_pool_size'], sort_keys=True)}")
+    print(
+        f"[{split_name}] target_intersections_count="
+        f"{json.dumps(stats['target_intersections_count'], sort_keys=True)}"
+    )
     print(f"[{split_name}] strategy_distribution={json.dumps(stats['strategy_distribution'], sort_keys=True)}")
     print(
         f"[{split_name}] priority_corridor_distribution="
@@ -410,17 +444,10 @@ def print_split_diagnostics(split_name: str, stats: dict[str, Any]) -> None:
         f"[{split_name}] duration_steps_distribution="
         f"{json.dumps(stats['duration_steps_distribution'], sort_keys=True)}"
     )
+    print(f"[{split_name}] assistant_uniqueness_ratio={stats['assistant_uniqueness_ratio']:.3f}")
     print(
-        f"[{split_name}] candidate_intersections_count="
-        f"{json.dumps(stats['candidate_intersections_count'], sort_keys=True)}"
-    )
-    print(
-        f"[{split_name}] average_target_intersections={stats['average_target_intersections']:.3f} "
-        f"assistant_uniqueness_ratio={stats['assistant_uniqueness_ratio']:.3f}"
-    )
-    print(
-        f"[{split_name}] duplicate_row_count_removed={stats['duplicate_row_count_removed']} "
-        f"low_signal_row_count_removed={stats['low_signal_row_count_removed']}"
+        f"[{split_name}] duplicate_rows_removed={stats['duplicate_rows_removed']} "
+        f"low_signal_rows_removed={stats['low_signal_rows_removed']}"
     )
 
 
@@ -443,8 +470,8 @@ def main() -> None:
         raise ValueError("Teacher checkpoint env configs differ. Use one DQN family per generation run.")
     env_config = checkpoint_env_configs[0] if checkpoint_env_configs else default_env_config()
 
-    train_specs = build_scenario_specs(dataset, "train", args.cities, allowed_scenarios)
-    val_specs = build_scenario_specs(dataset, "val", args.cities, allowed_scenarios)
+    train_specs = build_balanced_scenario_specs(dataset, "train", args.cities, allowed_scenarios)
+    val_specs = build_balanced_scenario_specs(dataset, "val", args.cities, allowed_scenarios)
 
     train_result = collect_split_rows("train", args.num_train, train_specs, teachers, env_config, args)
     val_result = collect_split_rows("val", args.num_val, val_specs, teachers, env_config, args)

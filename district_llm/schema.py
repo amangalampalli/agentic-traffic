@@ -24,14 +24,85 @@ PRIORITY_CORRIDORS: tuple[str, ...] = (
     "arterial",
 )
 DOMINANT_FLOWS: tuple[str, ...] = ("NS", "EW", "BALANCED")
+CANDIDATE_REASON_TAGS: tuple[str, ...] = (
+    "congested",
+    "boundary",
+    "spillback",
+    "incident",
+    "outgoing",
+    "overload",
+    "event",
+)
 
 
 def _round_float(value: float, digits: int = 3) -> float:
     return round(float(value), digits)
 
 
-def _stable_string_list(values: list[str] | tuple[str, ...] | None, limit: int | None = None) -> list[str]:
-    normalized = sorted({str(item) for item in (values or []) if str(item).strip()})
+def _dedupe_string_list(values: list[str] | tuple[str, ...] | None, limit: int | None = None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in values or []:
+        value = str(item).strip()
+        if not value or value in seen:
+            continue
+        normalized.append(value)
+        seen.add(value)
+        if limit is not None and len(normalized) >= limit:
+            break
+    return normalized
+
+
+def _stable_reason_list(values: list[str] | tuple[str, ...] | None) -> list[str]:
+    present = {str(item).strip() for item in (values or []) if str(item).strip()}
+    return [item for item in CANDIDATE_REASON_TAGS if item in present]
+
+
+def candidate_priority_score(candidate: "CandidateIntersection | dict[str, Any]") -> float:
+    item = candidate.to_dict() if hasattr(candidate, "to_dict") else dict(candidate)
+    queue_total = float(item.get("queue_total", 0.0))
+    wait_total = float(item.get("wait_total", 0.0))
+    outgoing_load = float(item.get("outgoing_load", 0.0))
+    score = queue_total + 1.5 * wait_total + 0.5 * outgoing_load
+    score += 2.0 * float(bool(item.get("spillback_risk", False)))
+    score += 1.5 * float(bool(item.get("incident_proximity", False)))
+    score += 1.0 * float(bool(item.get("is_boundary", False)))
+    score += 0.75 * float(bool(item.get("event_proximity", False)))
+    score += 0.75 * float(bool(item.get("overload_marker", False)))
+    return score
+
+
+def candidate_priority_tuple(candidate: "CandidateIntersection | dict[str, Any]") -> tuple[float, float, float, float, str]:
+    item = candidate.to_dict() if hasattr(candidate, "to_dict") else dict(candidate)
+    return (
+        candidate_priority_score(item),
+        float(item.get("queue_total", 0.0)),
+        float(item.get("wait_total", 0.0)),
+        float(item.get("outgoing_load", 0.0)),
+        str(item.get("intersection_id", "")),
+    )
+
+
+def canonicalize_target_intersections(
+    targets: list[str] | tuple[str, ...] | None,
+    candidates: list["CandidateIntersection | dict[str, Any]"] | None = None,
+    limit: int | None = None,
+) -> list[str]:
+    normalized = _dedupe_string_list(targets, limit=None)
+    if not candidates:
+        return normalized[:limit] if limit is not None else normalized
+
+    candidate_order = {
+        str(candidate.to_dict()["intersection_id"] if hasattr(candidate, "to_dict") else candidate["intersection_id"]): (
+            -candidate_priority_tuple(candidate)[0],
+            -candidate_priority_tuple(candidate)[1],
+            -candidate_priority_tuple(candidate)[2],
+            -candidate_priority_tuple(candidate)[3],
+            candidate_priority_tuple(candidate)[4],
+        )
+        for candidate in candidates
+    }
+    normalized.sort(key=lambda item: candidate_order.get(item, (1.0, 1.0, 1.0, 1.0, item)))
     if limit is not None:
         normalized = normalized[:limit]
     return normalized
@@ -68,6 +139,65 @@ class CongestedIntersection:
 
 
 @dataclass
+class CandidateIntersection:
+    intersection_id: str
+    queue_total: float
+    wait_total: float
+    outgoing_load: float
+    current_phase: int
+    is_boundary: bool
+    spillback_risk: bool = False
+    incident_proximity: bool = False
+    overload_marker: bool = False
+    event_proximity: bool = False
+    corridor_alignment: str = "BALANCED"
+    selection_reasons: list[str] = field(default_factory=list)
+
+    def validate(self) -> "CandidateIntersection":
+        if self.corridor_alignment not in DOMINANT_FLOWS:
+            raise ValueError(
+                f"Invalid corridor_alignment '{self.corridor_alignment}'. Expected one of {DOMINANT_FLOWS}."
+            )
+        self.selection_reasons = _stable_reason_list(self.selection_reasons)
+        return self
+
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        return {
+            "intersection_id": self.intersection_id,
+            "queue_total": _round_float(self.queue_total),
+            "wait_total": _round_float(self.wait_total),
+            "outgoing_load": _round_float(self.outgoing_load),
+            "current_phase": int(self.current_phase),
+            "is_boundary": bool(self.is_boundary),
+            "spillback_risk": bool(self.spillback_risk),
+            "incident_proximity": bool(self.incident_proximity),
+            "overload_marker": bool(self.overload_marker),
+            "event_proximity": bool(self.event_proximity),
+            "corridor_alignment": self.corridor_alignment,
+            "selection_reasons": list(self.selection_reasons),
+        }
+
+    def to_prompt_line(self) -> str:
+        self.validate()
+        reasons = "|".join(self.selection_reasons) if self.selection_reasons else "none"
+        return (
+            f"- {self.intersection_id} "
+            f"q={self.queue_total:.2f} "
+            f"w={self.wait_total:.2f} "
+            f"out={self.outgoing_load:.2f} "
+            f"phase={self.current_phase} "
+            f"boundary={int(self.is_boundary)} "
+            f"spillback={int(self.spillback_risk)} "
+            f"incident={int(self.incident_proximity)} "
+            f"overload={int(self.overload_marker)} "
+            f"event={int(self.event_proximity)} "
+            f"align={self.corridor_alignment} "
+            f"reasons={reasons}"
+        )
+
+
+@dataclass
 class DistrictAction:
     strategy: str = "hold"
     priority_corridor: str | None = None
@@ -93,7 +223,7 @@ class DistrictAction:
             raise ValueError("duration_steps must be an integer.")
         if not 1 <= self.duration_steps <= 20:
             raise ValueError("duration_steps must be between 1 and 20.")
-        self.target_intersections = _stable_string_list(self.target_intersections, limit=8)
+        self.target_intersections = _dedupe_string_list(self.target_intersections, limit=8)
         return self
 
     @classmethod
@@ -179,6 +309,7 @@ class DistrictStateSummary:
     overload_flag: bool
     event_flag: bool
     top_congested_intersections: list[CongestedIntersection] = field(default_factory=list)
+    candidate_intersections: list[CandidateIntersection] = field(default_factory=list)
 
     def validate(self) -> "DistrictStateSummary":
         if self.dominant_flow not in DOMINANT_FLOWS:
@@ -186,7 +317,19 @@ class DistrictStateSummary:
                 f"Invalid dominant_flow '{self.dominant_flow}'. Expected one of {DOMINANT_FLOWS}."
             )
         self.top_congested_intersections = list(self.top_congested_intersections[:5])
+        self.candidate_intersections = list(self.candidate_intersections[:8])
         return self
+
+    def candidate_ids(self) -> list[str]:
+        self.validate()
+        return [item.intersection_id for item in self.candidate_intersections]
+
+    def candidate_lookup(self) -> dict[str, CandidateIntersection]:
+        self.validate()
+        return {
+            item.intersection_id: item
+            for item in self.candidate_intersections
+        }
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -227,6 +370,9 @@ class DistrictStateSummary:
             "top_congested_intersections": [
                 item.to_dict() for item in self.top_congested_intersections
             ],
+            "candidate_intersections": [
+                item.to_dict() for item in self.candidate_intersections
+            ],
         }
 
     def to_json(self) -> str:
@@ -235,8 +381,11 @@ class DistrictStateSummary:
     def to_prompt_text(self) -> str:
         self.validate()
         top_lines = [item.to_prompt_line() for item in self.top_congested_intersections]
+        candidate_lines = [item.to_prompt_line() for item in self.candidate_intersections]
         if not top_lines:
             top_lines = ["- none"]
+        if not candidate_lines:
+            candidate_lines = ["- none"]
         return "\n".join(
             [
                 f"city_id: {self.city_id}",
@@ -274,5 +423,7 @@ class DistrictStateSummary:
                 f"event_flag: {int(self.event_flag)}",
                 "top_congested_intersections:",
                 *top_lines,
+                "candidate_intersections:",
+                *candidate_lines,
             ]
         )

@@ -25,7 +25,7 @@ from agents.local_policy import FixedCyclePolicy, HoldPhasePolicy, QueueGreedyPo
 from env.observation_builder import ObservationConfig
 from env.reward import RewardConfig
 from env.traffic_env import EnvConfig, TrafficEnv
-from training.dataset import CityFlowDataset, ScenarioSpec
+from training.cityflow_dataset import CityFlowDataset, ScenarioSpec
 from training.device import configure_torch_runtime, resolve_torch_device
 from training.models import POLICY_ARCHES, RunningNormalizer, TrafficControlQNetwork
 from training.rollout import evaluate_policy
