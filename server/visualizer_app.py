@@ -187,15 +187,33 @@ def run_simulations(request: RunSimulationsRequest) -> RunSimulationsResponse:
     )
 
 
-@app.get("/replay/{city_id}/{scenario_name}/{policy_name}")
-def get_replay(city_id: str, scenario_name: str, policy_name: str) -> FileResponse:
-    """Return the replay.txt for a given city/scenario/policy."""
+@app.get("/replay/{city_id}/{scenario_name}/{policy_name}", response_model=None)
+def get_replay(
+    city_id: str,
+    scenario_name: str,
+    policy_name: str,
+    max_steps: int = 0,
+) -> PlainTextResponse | FileResponse:
+    """Return the replay.txt for a given city/scenario/policy.
+
+    Pass ``?max_steps=N`` to limit the response to the first N non-empty lines
+    (steps), keeping browser memory usage bounded for large cities.
+    """
     replay_path = REPLAY_OUTPUT_ROOT / city_id / scenario_name / policy_name / "replay.txt"
     if not replay_path.exists():
         raise HTTPException(
             status_code=404,
             detail=f"Replay not found for {city_id}/{scenario_name}/{policy_name}. Run /run-simulations first.",
         )
+    if max_steps > 0:
+        lines: list[str] = []
+        with open(replay_path, encoding="utf-8") as fh:
+            for raw in fh:
+                if raw.strip():
+                    lines.append(raw.rstrip("\n"))
+                    if len(lines) >= max_steps:
+                        break
+        return PlainTextResponse("\n".join(lines))
     return FileResponse(str(replay_path), media_type="text/plain")
 
 
