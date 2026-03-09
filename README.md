@@ -13,6 +13,8 @@ app_port: 7860
 
 CityFlow-based traffic-control project with intersection-level multi-agent DQN training and district-aware policy variants.
 
+Full model weights and files can be found here: https://huggingface.co/Aditya2162/agentic-traffic
+
 ## OpenEnv UI
 
 For the deployed OpenEnv web interface:
