@@ -35,3 +35,12 @@ class StateResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     message: str
+
+
+class ReplayResponse(BaseModel):
+    city_id: str
+    scenario_name: str
+    policy_name: str
+    replay_text: str
+    roadnet_log: dict[str, Any] = Field(default_factory=dict)
+    metrics: dict[str, Any] = Field(default_factory=dict)
