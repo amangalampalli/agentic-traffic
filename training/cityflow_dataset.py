@@ -61,11 +61,21 @@ class CityFlowDataset:
                 raise FileNotFoundError(f"Missing split file: {split_path}")
             self.generate_default_splits()
 
-        return [
+        split_cities = [
             line.strip()
             for line in split_path.read_text().splitlines()
             if line.strip()
         ]
+        available_cities = set(self.discover_cities())
+        filtered_cities = [city_id for city_id in split_cities if city_id in available_cities]
+        if filtered_cities:
+            return filtered_cities
+
+        if create_if_missing and available_cities:
+            splits = self.generate_default_splits(overwrite=True)
+            return splits.get(split_name, [])
+
+        return filtered_cities
 
     def generate_default_splits(
         self,
@@ -91,17 +101,34 @@ class CityFlowDataset:
         rng.shuffle(city_ids)
 
         num_cities = len(city_ids)
-        train_count = int(num_cities * train_ratio)
-        val_count = int(num_cities * val_ratio)
-        test_count = num_cities - train_count - val_count
-        if test_count <= 0:
-            raise ValueError("Split ratios leave no cities for the test set.")
+        if num_cities == 0:
+            splits = {"train": [], "val": [], "test": []}
+        elif num_cities == 1:
+            splits = {"train": city_ids[:], "val": city_ids[:], "test": city_ids[:]}
+        elif num_cities == 2:
+            splits = {
+                "train": sorted(city_ids[:1]),
+                "val": sorted(city_ids[1:2]),
+                "test": sorted(city_ids[:1]),
+            }
+        else:
+            train_count = max(1, int(num_cities * train_ratio))
+            val_count = int(num_cities * val_ratio)
+            if train_count + val_count >= num_cities:
+                val_count = max(0, num_cities - train_count - 1)
+            test_count = num_cities - train_count - val_count
+            if test_count <= 0:
+                test_count = 1
+                if val_count > 0:
+                    val_count -= 1
+                else:
+                    train_count = max(1, train_count - 1)
 
-        splits = {
-            "train": sorted(city_ids[:train_count]),
-            "val": sorted(city_ids[train_count : train_count + val_count]),
-            "test": sorted(city_ids[train_count + val_count :]),
-        }
+            splits = {
+                "train": sorted(city_ids[:train_count]),
+                "val": sorted(city_ids[train_count : train_count + val_count]),
+                "test": sorted(city_ids[train_count + val_count :]),
+            }
 
         for split_name, city_list in splits.items():
             split_path = self.splits_root / f"{split_name}_cities.txt"
@@ -131,6 +158,12 @@ class CityFlowDataset:
         scenario_name: str | None = None,
     ) -> ScenarioSpec:
         available_cities = self.load_split(split_name)
+        if not available_cities:
+            available_cities = self.discover_cities()
+        if not available_cities:
+            raise FileNotFoundError(
+                f"No generated cities found under {self.generated_root} for split '{split_name}'."
+            )
         selected_city = city_id or rng.choice(available_cities)
         selected_scenario = scenario_name or rng.choice(self.scenarios_for_city(selected_city))
         return self.build_scenario_spec(selected_city, selected_scenario)

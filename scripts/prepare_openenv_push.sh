@@ -23,6 +23,8 @@ cp -a "${ROOT_DIR}/env" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/training" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/third_party/CityFlow" "${OUT_DIR}/third_party/"
 cp -a "${ROOT_DIR}/data/splits" "${OUT_DIR}/data/"
+mkdir -p "${OUT_DIR}/data/generated"
+cp -a "${ROOT_DIR}/data/generated/city_0002" "${OUT_DIR}/data/generated/"
 cp -a "${ROOT_DIR}/artifacts/dqn_shared/best_validation.pt" "${OUT_DIR}/artifacts/dqn_shared/"
 cp -a "${ROOT_DIR}/artifacts/district_llm_adapter_v3/main_run/adapter" \
   "${OUT_DIR}/artifacts/district_llm_adapter_v3/main_run/"

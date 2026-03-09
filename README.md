@@ -13,6 +13,15 @@ app_port: 7860
 
 CityFlow-based traffic-control project with intersection-level multi-agent DQN training and district-aware policy variants.
 
+## OpenEnv UI
+
+For the deployed OpenEnv web interface:
+
+- Click `Reset` before using `Step`.
+- Leave `Use Llm` unchecked for the fast, stable DQN-only path.
+- Use `District Actions` = `{}` for a valid no-op step payload.
+- Only enable `Use Llm` when you explicitly want district-level LLM guidance on top of the DQN executor.
+
 ## Training
 
 The default local-policy trainer now uses parameter-shared dueling Double DQN with prioritized replay and n-step returns:

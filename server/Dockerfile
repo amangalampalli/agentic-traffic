@@ -33,6 +33,7 @@ COPY openenv_app/     ./openenv_app/
 COPY server/          ./server/
 COPY training/        ./training/
 COPY data/splits/     ./data/splits/
+COPY data/generated/city_0002/ ./data/generated/city_0002/
 COPY artifacts/dqn_shared/best_validation.pt ./artifacts/dqn_shared/best_validation.pt
 COPY artifacts/district_llm_adapter_v3/main_run/adapter/ ./artifacts/district_llm_adapter_v3/main_run/adapter/
 
