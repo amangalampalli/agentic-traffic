@@ -1,0 +1,13 @@
+{
+  "interval": 1.0,
+  "seed": 1446,
+  "dir": "C:/Users/toke/Desktop/agentic-traffic/data/generated/city_0001/",
+  "roadnetFile": "roadnet.json",
+  "flowFile": "scenarios/construction/flow.json",
+  "rlTrafficLight": true,
+  "laneChange": false,
+  "saveReplay": false,
+  "roadnetLogFile": "scenarios/construction/roadnetLogFile.json",
+  "replayLogFile": "scenarios/construction/replay.txt",
+  "step": 3600
+}

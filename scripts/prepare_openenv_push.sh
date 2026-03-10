@@ -9,12 +9,8 @@ mkdir -p "${OUT_DIR}"
 mkdir -p "${OUT_DIR}/third_party" "${OUT_DIR}/data" "${OUT_DIR}/artifacts/dqn_shared" \
   "${OUT_DIR}/artifacts/district_llm_adapter_v3/main_run"
 
+cp -a "${ROOT_DIR}/Dockerfile" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/README.md" "${OUT_DIR}/"
-cp -a "${ROOT_DIR}/__init__.py" "${OUT_DIR}/"
-cp -a "${ROOT_DIR}/client.py" "${OUT_DIR}/"
-cp -a "${ROOT_DIR}/models.py" "${OUT_DIR}/"
-cp -a "${ROOT_DIR}/openenv.yaml" "${OUT_DIR}/"
-cp -a "${ROOT_DIR}/pyproject.toml" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/openenv_app" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/server" "${OUT_DIR}/"
 cp -a "${ROOT_DIR}/agents" "${OUT_DIR}/"

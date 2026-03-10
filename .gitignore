@@ -3,7 +3,7 @@ __pycache__
 data/generated/*
 .DS_Store
 data/district_llm_dataset_v1
-data/
+data/generated
 build/
 build-docker/
 local/
@@ -18,3 +18,5 @@ CityFlow.egg-info
 frontend/replay/*
 notebooks/unsloth_compiled_cache
 artifacts/*
+.openenv_push
+results/

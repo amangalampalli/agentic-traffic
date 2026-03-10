@@ -1,0 +1,13 @@
+{
+  "interval": 1.0,
+  "seed": 1042,
+  "dir": "/Users/aditya/Developer/traffic-llm/data/generated/city_0001/",
+  "roadnetFile": "/Users/aditya/Developer/traffic-llm/data/generated/city_0001/roadnet.json",
+  "flowFile": "/Users/aditya/Developer/traffic-llm/data/generated/city_0001/scenarios/normal/flow.json",
+  "rlTrafficLight": true,
+  "laneChange": false,
+  "saveReplay": false,
+  "roadnetLogFile": "/Users/aditya/Developer/traffic-llm/data/generated/city_0001/scenarios/normal/normal_roadnet_log.json",
+  "replayLogFile": "/Users/aditya/Developer/traffic-llm/data/generated/city_0001/scenarios/normal/normal_replay.txt",
+  "step": 3600
+}

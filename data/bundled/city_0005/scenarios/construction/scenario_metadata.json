@@ -1,0 +1,291 @@
+{
+  "name": "construction",
+  "intensity": "accident_overload",
+  "seed": 41458,
+  "trip_multiplier": 11.50875,
+  "trip_mix": {
+    "intra_district": 0.18,
+    "adjacent_district": 0.466,
+    "long_distance": 0.354
+  },
+  "blocked_roads": [
+    "r_i_0010_i_0009",
+    "r_i_0013_i_0019",
+    "r_i_0015_i_0014",
+    "r_i_0019_i_0018"
+  ],
+  "penalized_roads": {
+    "r_i_0014_i_0015": 12.5,
+    "r_i_0015_i_0009": 12.5,
+    "r_i_0009_i_0008": 12.5,
+    "r_i_0007_i_0013": 12.5,
+    "r_i_0009_i_0015": 12.5,
+    "r_i_0014_i_0008": 12.5,
+    "r_i_0013_i_0007": 12.5,
+    "r_i_0012_i_0006": 12.5,
+    "r_i_0020_i_0014": 12.5,
+    "r_i_0008_i_0009": 12.5,
+    "r_i_0013_i_0019": 19.375,
+    "r_i_0018_i_0024": 12.5,
+    "r_i_0024_i_0018": 12.5,
+    "r_i_0014_i_0013": 12.5,
+    "r_i_0016_i_0015": 12.5,
+    "r_i_0003_i_0009": 12.5,
+    "r_i_0008_i_0014": 12.5,
+    "r_i_0020_i_0019": 12.5,
+    "r_i_0021_i_0015": 12.5,
+    "r_i_0006_i_0012": 12.5,
+    "r_i_0019_i_0013": 12.5,
+    "r_i_0018_i_0019": 12.5,
+    "r_i_0010_i_0009": 19.375,
+    "r_i_0013_i_0014": 12.5,
+    "r_i_0019_i_0018": 19.375,
+    "r_i_0025_i_0019": 12.5,
+    "r_i_0012_i_0013": 12.5,
+    "r_i_0012_i_0018": 12.5,
+    "r_i_0015_i_0014": 19.375,
+    "r_i_0015_i_0021": 12.5,
+    "r_i_0019_i_0025": 12.5,
+    "r_i_0019_i_0020": 12.5,
+    "r_i_0018_i_0012": 12.5,
+    "r_i_0013_i_0012": 12.5,
+    "r_i_0015_i_0016": 12.5,
+    "r_i_0009_i_0010": 12.5
+  },
+  "event_district": null,
+  "overload_district": null,
+  "diagnostics": {
+    "total_vehicles": 32224,
+    "vehicles_by_origin_district": {
+      "d_02": 3036,
+      "d_06": 5161,
+      "d_07": 4021,
+      "d_08": 4580,
+      "d_04": 3045,
+      "d_01": 3876,
+      "d_05": 1443,
+      "d_00": 1107,
+      "external": 5108,
+      "d_03": 847
+    },
+    "vehicles_by_destination_district": {
+      "d_01": 4475,
+      "d_03": 2154,
+      "external": 5065,
+      "d_08": 2527,
+      "d_06": 8209,
+      "d_05": 2431,
+      "d_00": 985,
+      "d_02": 1546,
+      "d_07": 1836,
+      "d_04": 2996
+    },
+    "vehicles_from_external": 5108,
+    "vehicles_to_external": 5065,
+    "roads_used": 149,
+    "unused_roads": 9,
+    "boundary_road_usage": 82478,
+    "gateway_road_usage": 10173,
+    "boundary_road_share": 0.4248,
+    "top_used_roads": [
+      {
+        "road_id": "r_i_0022_i_0016",
+        "traversals": 6693,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0016_i_0010",
+        "traversals": 6639,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0016_i_0022",
+        "traversals": 6628,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0010_i_0004",
+        "traversals": 6594,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0010_i_0016",
+        "traversals": 6478,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0004_i_0010",
+        "traversals": 6300,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0004_i_0003",
+        "traversals": 6253,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0003_i_0002",
+        "traversals": 6170,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0003_i_0004",
+        "traversals": 5455,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0021_i_0020",
+        "traversals": 5138,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0022_i_0021",
+        "traversals": 5060,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0020_i_0021",
+        "traversals": 4756,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0021_i_0022",
+        "traversals": 4712,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0002_i_0008",
+        "traversals": 4702,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0002_i_0003",
+        "traversals": 4507,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      }
+    ],
+    "top_used_corridors": [
+      {
+        "corridor": "d_07->d_04",
+        "traversals": 9253
+      },
+      {
+        "corridor": "d_04->d_07",
+        "traversals": 8155
+      },
+      {
+        "corridor": "d_07->d_01",
+        "traversals": 7228
+      },
+      {
+        "corridor": "d_01->d_07",
+        "traversals": 6815
+      },
+      {
+        "corridor": "d_04->d_08",
+        "traversals": 6002
+      },
+      {
+        "corridor": "d_08->d_04",
+        "traversals": 5996
+      },
+      {
+        "corridor": "d_02->d_01",
+        "traversals": 4172
+      },
+      {
+        "corridor": "d_01->d_02",
+        "traversals": 4036
+      },
+      {
+        "corridor": "d_08->d_05",
+        "traversals": 3365
+      },
+      {
+        "corridor": "d_04->d_03",
+        "traversals": 2864
+      }
+    ],
+    "estimated_congestion_intensity": {
+      "score": 100.0,
+      "level": "extreme",
+      "demand_per_lane": 74.593,
+      "avg_route_length": 6.025,
+      "road_usage_concentration": 0.3211
+    }
+  },
+  "details": {
+    "description": "Localized but severe construction bottlenecks.",
+    "base_demand_per_intersection": 56,
+    "construction_roads": [
+      "r_i_0010_i_0009",
+      "r_i_0013_i_0019",
+      "r_i_0015_i_0014",
+      "r_i_0019_i_0018"
+    ],
+    "bottleneck_penalties": {
+      "r_i_0014_i_0015": 12.5,
+      "r_i_0015_i_0009": 12.5,
+      "r_i_0009_i_0008": 12.5,
+      "r_i_0007_i_0013": 12.5,
+      "r_i_0009_i_0015": 12.5,
+      "r_i_0014_i_0008": 12.5,
+      "r_i_0013_i_0007": 12.5,
+      "r_i_0012_i_0006": 12.5,
+      "r_i_0020_i_0014": 12.5,
+      "r_i_0008_i_0009": 12.5,
+      "r_i_0018_i_0024": 12.5,
+      "r_i_0024_i_0018": 12.5,
+      "r_i_0014_i_0013": 12.5,
+      "r_i_0016_i_0015": 12.5,
+      "r_i_0003_i_0009": 12.5,
+      "r_i_0008_i_0014": 12.5,
+      "r_i_0020_i_0019": 12.5,
+      "r_i_0021_i_0015": 12.5,
+      "r_i_0006_i_0012": 12.5,
+      "r_i_0019_i_0013": 12.5,
+      "r_i_0018_i_0019": 12.5,
+      "r_i_0013_i_0014": 12.5,
+      "r_i_0025_i_0019": 12.5,
+      "r_i_0012_i_0013": 12.5,
+      "r_i_0012_i_0018": 12.5,
+      "r_i_0015_i_0021": 12.5,
+      "r_i_0019_i_0025": 12.5,
+      "r_i_0019_i_0020": 12.5,
+      "r_i_0018_i_0012": 12.5,
+      "r_i_0013_i_0012": 12.5,
+      "r_i_0015_i_0016": 12.5,
+      "r_i_0009_i_0010": 12.5
+    }
+  }
+}

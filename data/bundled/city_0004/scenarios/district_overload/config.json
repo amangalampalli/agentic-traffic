@@ -1,0 +1,13 @@
+{
+  "interval": 1.0,
+  "seed": 31657,
+  "dir": "C:/Users/toke/Desktop/agentic-traffic/data/generated/city_0004/",
+  "roadnetFile": "roadnet.json",
+  "flowFile": "scenarios/district_overload/flow.json",
+  "rlTrafficLight": true,
+  "laneChange": false,
+  "saveReplay": false,
+  "roadnetLogFile": "scenarios/district_overload/roadnetLogFile.json",
+  "replayLogFile": "scenarios/district_overload/replay.txt",
+  "step": 3600
+}

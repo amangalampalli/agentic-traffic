@@ -1,0 +1,257 @@
+{
+  "name": "accident",
+  "intensity": "heavy_rush",
+  "seed": 41357,
+  "trip_multiplier": 8.4984375,
+  "trip_mix": {
+    "intra_district": 0.22000000000000003,
+    "adjacent_district": 0.43300000000000005,
+    "long_distance": 0.34700000000000003
+  },
+  "blocked_roads": [
+    "r_i_0012_i_0006",
+    "r_i_0016_i_0022"
+  ],
+  "penalized_roads": {
+    "r_i_0012_i_0006": 10.5,
+    "r_i_0016_i_0022": 10.5,
+    "r_i_0018_i_0012": 8.19,
+    "r_i_0006_i_0012": 8.19,
+    "r_i_0012_i_0018": 8.19,
+    "r_i_0013_i_0012": 8.19,
+    "r_i_0012_i_0013": 8.19,
+    "r_i_0016_i_0010": 8.19,
+    "r_i_0016_i_0015": 8.19,
+    "r_i_0023_i_0022": 8.19,
+    "r_i_0022_i_0028": 8.19,
+    "r_i_0021_i_0022": 8.19,
+    "r_i_0017_i_0016": 8.19,
+    "r_i_0022_i_0021": 8.19,
+    "r_i_0016_i_0017": 8.19,
+    "r_i_0010_i_0016": 8.19,
+    "r_i_0015_i_0016": 8.19,
+    "r_i_0022_i_0016": 8.19,
+    "r_i_0028_i_0022": 8.19,
+    "r_i_0022_i_0023": 8.19
+  },
+  "event_district": null,
+  "overload_district": null,
+  "diagnostics": {
+    "total_vehicles": 25495,
+    "vehicles_by_origin_district": {
+      "external": 3561,
+      "d_04": 2586,
+      "d_07": 4037,
+      "d_01": 3914,
+      "d_03": 1004,
+      "d_06": 3904,
+      "d_00": 1148,
+      "d_02": 2946,
+      "d_05": 603,
+      "d_08": 1792
+    },
+    "vehicles_by_destination_district": {
+      "d_06": 5974,
+      "d_01": 3880,
+      "d_02": 1787,
+      "d_00": 985,
+      "d_07": 1853,
+      "d_03": 2311,
+      "d_08": 1356,
+      "external": 3467,
+      "d_04": 2721,
+      "d_05": 1161
+    },
+    "vehicles_from_external": 3561,
+    "vehicles_to_external": 3467,
+    "roads_used": 155,
+    "unused_roads": 3,
+    "boundary_road_usage": 55019,
+    "gateway_road_usage": 7028,
+    "boundary_road_share": 0.4546,
+    "top_used_roads": [
+      {
+        "road_id": "r_i_0021_i_0020",
+        "traversals": 2956,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0009_i_0015",
+        "traversals": 2786,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0020_i_0021",
+        "traversals": 2754,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0010_i_0009",
+        "traversals": 2724,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0014_i_0013",
+        "traversals": 2610,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0027_i_0028",
+        "traversals": 2426,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0021_i_0027",
+        "traversals": 2373,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0028_i_0027",
+        "traversals": 2365,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0014_i_0020",
+        "traversals": 2340,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0028_i_0034",
+        "traversals": 2270,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0013_i_0014",
+        "traversals": 2211,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0027_i_0021",
+        "traversals": 2192,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0004_i_0010",
+        "traversals": 2110,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0020_i_0014",
+        "traversals": 2086,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0015_i_0009",
+        "traversals": 2002,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      }
+    ],
+    "top_used_corridors": [
+      {
+        "corridor": "d_04->d_08",
+        "traversals": 6330
+      },
+      {
+        "corridor": "d_08->d_04",
+        "traversals": 5888
+      },
+      {
+        "corridor": "d_01->d_06",
+        "traversals": 5578
+      },
+      {
+        "corridor": "d_06->d_04",
+        "traversals": 4531
+      },
+      {
+        "corridor": "d_06->d_01",
+        "traversals": 4099
+      },
+      {
+        "corridor": "d_04->d_06",
+        "traversals": 3957
+      },
+      {
+        "corridor": "d_04->d_03",
+        "traversals": 2270
+      },
+      {
+        "corridor": "d_07->d_04",
+        "traversals": 1944
+      },
+      {
+        "corridor": "d_02->d_01",
+        "traversals": 1840
+      },
+      {
+        "corridor": "external->d_01",
+        "traversals": 1680
+      }
+    ],
+    "estimated_congestion_intensity": {
+      "score": 100.0,
+      "level": "extreme",
+      "demand_per_lane": 59.016,
+      "avg_route_length": 4.747,
+      "road_usage_concentration": 0.2115
+    }
+  },
+  "details": {
+    "description": "Severe disruption on connector/arterial corridors.",
+    "base_demand_per_intersection": 60,
+    "accident_roads": [
+      "r_i_0012_i_0006",
+      "r_i_0016_i_0022"
+    ],
+    "bottleneck_penalties": {
+      "r_i_0018_i_0012": 8.19,
+      "r_i_0006_i_0012": 8.19,
+      "r_i_0012_i_0018": 8.19,
+      "r_i_0013_i_0012": 8.19,
+      "r_i_0012_i_0013": 8.19,
+      "r_i_0016_i_0010": 8.19,
+      "r_i_0016_i_0015": 8.19,
+      "r_i_0023_i_0022": 8.19,
+      "r_i_0022_i_0028": 8.19,
+      "r_i_0021_i_0022": 8.19,
+      "r_i_0017_i_0016": 8.19,
+      "r_i_0022_i_0021": 8.19,
+      "r_i_0016_i_0017": 8.19,
+      "r_i_0010_i_0016": 8.19,
+      "r_i_0015_i_0016": 8.19,
+      "r_i_0022_i_0016": 8.19,
+      "r_i_0028_i_0022": 8.19,
+      "r_i_0022_i_0023": 8.19
+    }
+  }
+}

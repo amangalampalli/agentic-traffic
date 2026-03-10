@@ -1,0 +1,209 @@
+{
+  "name": "evening_rush",
+  "intensity": "heavy_rush",
+  "seed": 31253,
+  "trip_multiplier": 4.784062500000001,
+  "trip_mix": {
+    "intra_district": 0.28,
+    "adjacent_district": 0.41300000000000003,
+    "long_distance": 0.30700000000000005
+  },
+  "blocked_roads": [],
+  "penalized_roads": {},
+  "event_district": null,
+  "overload_district": null,
+  "diagnostics": {
+    "total_vehicles": 10945,
+    "vehicles_by_origin_district": {
+      "d_06": 1711,
+      "d_02": 662,
+      "d_00": 1286,
+      "d_07": 1156,
+      "d_08": 462,
+      "d_03": 627,
+      "d_01": 1906,
+      "d_05": 997,
+      "external": 1407,
+      "d_04": 731
+    },
+    "vehicles_by_destination_district": {
+      "d_03": 939,
+      "external": 1357,
+      "d_07": 316,
+      "d_02": 1338,
+      "d_04": 1618,
+      "d_00": 2473,
+      "d_06": 629,
+      "d_05": 306,
+      "d_01": 833,
+      "d_08": 1136
+    },
+    "vehicles_from_external": 1407,
+    "vehicles_to_external": 1357,
+    "roads_used": 138,
+    "unused_roads": 0,
+    "boundary_road_usage": 21015,
+    "gateway_road_usage": 2764,
+    "boundary_road_share": 0.4496,
+    "top_used_roads": [
+      {
+        "road_id": "r_i_0026_i_0020",
+        "traversals": 1008,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0016_i_0022",
+        "traversals": 982,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0022_i_0021",
+        "traversals": 945,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0010_i_0004",
+        "traversals": 945,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0004_i_0010",
+        "traversals": 801,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0021_i_0022",
+        "traversals": 785,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0013_i_0012",
+        "traversals": 758,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0026_i_0027",
+        "traversals": 752,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0021_i_0020",
+        "traversals": 699,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0009_i_0015",
+        "traversals": 679,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0028_i_0034",
+        "traversals": 672,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0034_i_0033",
+        "traversals": 666,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0020_i_0026",
+        "traversals": 640,
+        "is_arterial": true,
+        "is_inter_district": true,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0022_i_0028",
+        "traversals": 638,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      },
+      {
+        "road_id": "r_i_0010_i_0016",
+        "traversals": 622,
+        "is_arterial": true,
+        "is_inter_district": false,
+        "is_gateway": false
+      }
+    ],
+    "top_used_corridors": [
+      {
+        "corridor": "d_03->d_00",
+        "traversals": 1870
+      },
+      {
+        "corridor": "d_06->d_04",
+        "traversals": 1551
+      },
+      {
+        "corridor": "d_00->d_03",
+        "traversals": 1542
+      },
+      {
+        "corridor": "d_07->d_03",
+        "traversals": 1447
+      },
+      {
+        "corridor": "d_04->d_08",
+        "traversals": 1223
+      },
+      {
+        "corridor": "d_06->d_00",
+        "traversals": 981
+      },
+      {
+        "corridor": "d_06->d_02",
+        "traversals": 968
+      },
+      {
+        "corridor": "d_08->d_04",
+        "traversals": 860
+      },
+      {
+        "corridor": "d_01->d_06",
+        "traversals": 854
+      },
+      {
+        "corridor": "d_03->d_07",
+        "traversals": 837
+      }
+    ],
+    "estimated_congestion_intensity": {
+      "score": 88.056,
+      "level": "extreme",
+      "demand_per_lane": 28.803,
+      "avg_route_length": 4.27,
+      "road_usage_concentration": 0.1787
+    }
+  },
+  "details": {
+    "description": "Strong work-district outbound and residential inbound pressure.",
+    "base_demand_per_intersection": 52
+  }
+}

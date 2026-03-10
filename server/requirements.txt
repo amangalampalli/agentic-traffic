@@ -1,0 +1,4 @@
+# Additional packages needed by server/visualizer_app.py
+# (fastapi, uvicorn, pydantic, httpx are already in openenv_app/requirements.txt)
+joblib>=1.3.0
+python-multipart>=0.0.9
